@@ -1,194 +1,109 @@
-// ================= VERIFICATION ESSAI GRATUIT =================
+import React, { useState, useEffect } from 'react';
 
-const hasAccess = () => {
+const App = () => {
+  // --- ÉTATS PERSISTANTS (Gardent les infos même après fermeture du navigateur) ---
+  const [user, setUser] = useState(() => localStorage.getItem('user_email') || null);
+  const [day, setDay] = useState(() => Number(localStorage.getItem('current_day')) || 1);
+  const [isPaid, setIsPaid] = useState(() => localStorage.getItem('is_paid') === 'true');
+  const [activeTab, setActiveTab] = useState('workout');
 
-  if(subscriptionActive)
-    return true;
+  // --- SAUVEGARDE AUTOMATIQUE ---
+  useEffect(() => {
+    localStorage.setItem('user_email', user || '');
+    localStorage.setItem('current_day', day);
+    localStorage.setItem('is_paid', isPaid);
+  }, [user, day, isPaid]);
 
-
-  if(!trialStartDate)
-    return false;
-
-
-  const now = new Date();
-
-  const difference =
-    now - new Date(trialStartDate);
-
-
-  const days =
-    difference / (1000 * 60 * 60 * 24);
-
-
-  return days < 7;
-
-};// ================= PROFIL UTILISATEUR =================
-
-const [userProfile, setUserProfile] = useState(() => {
-  const saved = localStorage.getItem('defi_profile');
-  return saved ? JSON.parse(saved) : null;
-});
-
-const [age, setAge] = useState('');
-const [weight, setWeight] = useState('');
-const [height, setHeight] = useState('');
-
-const [imc, setImc] = useState(null);
-
-const [subscriptionActive, setSubscriptionActive] = useState(() => {
-  return localStorage.getItem('defi_subscription') === 'active';
-});
-
-const [trialStartDate, setTrialStartDate] = useState(() => {
-  const saved = localStorage.getItem('defi_trial_start');
-  return saved ? new Date(saved) : null;
-});// ================= CALCUL IMC =================
-
-const calculateIMC = () => {
-
-  const tailleMetre = Number(height) / 100;
-  const poids = Number(weight);
-
-  if (!tailleMetre || !poids) return;
-
-  const result = (poids / (tailleMetre * tailleMetre)).toFixed(1);
-
-  setImc(result);
-
-  return result;
-};
-
-
-// ================= CREATION PROFIL =================
-
-const saveProfile = () => {
-
-  const calculatedIMC = calculateIMC();
-
-  const profile = {
-    age: Number(age),
-    weight: Number(weight),
-    height: Number(height),
-    imc: Number(calculatedIMC)
+  // --- LOGIQUE DES EXERCICES ---
+  const getExerciseCount = (d) => {
+    if (d <= 7) return 10;
+    if (d <= 25) return 13;
+    if (d <= 50) return 17;
+    return 20;
   };
 
+  // --- LOGIQUE DES BADGES ---
+  const getBadge = (d) => {
+    if (d === 7) return "🏅 Badge Débutant (Jour 7)";
+    if (d === 20) return "🔥 Badge Guerrier (Jour 20)";
+    if (d === 30) return "⚡ Badge Athlète (Jour 30)";
+    if (d === 40) return "🦾 Badge Machine (Jour 40)";
+    if (d === 50) return "👑 Badge Légende (Jour 50)";
+    if (d === 60) return "🏆 Badge Ultime (Jour 60)";
+    return null;
+  };
 
-  localStorage.setItem(
-    'defi_profile',
-    JSON.stringify(profile)
-  );
+  // --- STYLES CSS INLIGNES (Design Sportif Sombre) ---
+  const styles = {
+    container: { background: '#0a0a0a', minHeight: '100vh', color: '#fff', padding: '20px', fontFamily: 'Arial, sans-serif' },
+    card: { background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '20px' },
+    button: { background: '#3b82f6', color: '#fff', border: 'none', padding: '15px 25px', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', width: '100%' },
+    payButton: { background: '#eab308', color: '#000', border: 'none', padding: '15px 25px', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.2rem', marginTop: '20px' }
+  };
 
-
-  setUserProfile(profile);
-
-
-  if(!trialStartDate){
-
-    const today = new Date();
-
-    localStorage.setItem(
-      'defi_trial_start',
-      today.toISOString()
+  // --- ÉCRAN CONNEXION ---
+  if (!user) {
+    return (
+      <div style={{ ...styles.container, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>PRO ATHLÈTE</h1>
+        <p style={{ color: '#888', marginBottom: '30px' }}>Connectez-vous pour commencer votre transformation.</p>
+        <input 
+          type="email" 
+          placeholder="Votre email..." 
+          style={{ padding: '15px', borderRadius: '10px', width: '250px', marginBottom: '10px', border: 'none' }}
+          onChange={(e) => this.inputVal = e.target.value}
+        />
+        <button style={styles.button} onClick={() => setUser(this.inputVal || 'athlète@sport.com')}>Commencer maintenant</button>
+      </div>
     );
-
-    setTrialStartDate(today);
   }
 
-};const PAYPAL_LINK =
-"https://paypal.me/TONCOMPTE";
+  // --- ÉCRAN DASHBOARD ---
+  return (
+    <div style={styles.container}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <h1 style={{ margin: 0 }}>Jour {day}</h1>
+        <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}>Déconnexion</button>
+      </header>
 
+      {/* BADGE */}
+      {getBadge(day) && <div style={{ background: '#eab308', padding: '15px', borderRadius: '10px', color: '#000', fontWeight: 'bold', marginBottom: '20px' }}>{getBadge(day)}</div>}
 
-const activateSubscription = () => {
+      {/* SYSTÈME DE PAIEMENT */}
+      {day > 7 && !isPaid ? (
+        <div style={{ textAlign: 'center', marginTop: '50px', padding: '40px', border: '2px dashed #eab308', borderRadius: '20px' }}>
+          <div style={{ fontSize: '4rem' }}>🔒</div>
+          <h2>Contenu verrouillé</h2>
+          <p>Le programme complet est accessible pour 4,99 €.</p>
+          <button style={styles.payButton} onClick={() => window.open("https://paypal.me/JubaBelkacemi", "_blank")}>Payer 4,99 € via PayPal</button>
+          <p style={{ marginTop: '20px', fontSize: '0.9rem', cursor: 'pointer', color: '#3b82f6' }} onClick={() => setIsPaid(true)}>Déjà payé ? Cliquez ici pour débloquer.</p>
+        </div>
+      ) : (
+        <div>
+          {/* NAVIGATION */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <button style={{ ...styles.button, background: activeTab === 'workout' ? '#3b82f6' : '#222' }} onClick={() => setActiveTab('workout')}>Séances</button>
+            <button style={{ ...styles.button, background: activeTab === 'nutrition' ? '#10b981' : '#222' }} onClick={() => setActiveTab('nutrition')}>Nutrition</button>
+          </div>
 
-  window.location.href = PAYPAL_LINK;
-
-};// ================= ECRAN PROFIL PREMIERE UTILISATION =================
-
-if(email && !userProfile){
-
-return (
-
-<div style={screenWrapperStyle}>
-
-<div style={{maxWidth:"500px",width:"100%"}}>
-
-<h1 style={{
-fontSize:"3rem",
-fontWeight:"900"
-}}>
-Ton Profil
-</h1>
-
-
-<p style={{
-color:"#94a3b8"
-}}>
-Ces informations permettent d'adapter ton programme.
-</p>
-
-
-<input
-placeholder="Âge"
-type="number"
-value={age}
-onChange={(e)=>setAge(e.target.value)}
-style={inputStyle}
-/>
-
-
-<input
-placeholder="Poids (kg)"
-type="number"
-value={weight}
-onChange={(e)=>setWeight(e.target.value)}
-style={inputStyle}
-/>
-
-
-<input
-placeholder="Taille (cm)"
-type="number"
-value={height}
-onChange={(e)=>setHeight(e.target.value)}
-style={inputStyle}
-/>
-
-
-
-<button
-onClick={saveProfile}
-style={{
-background:"#3b82f6",
-color:"white",
-border:"none",
-padding:"20px",
-borderRadius:"50px",
-width:"100%",
-fontWeight:"900",
-marginTop:"20px"
-}}
->
-Créer mon programme
-</button>
-
-
-</div>
-
-</div>
-
-);
-
-}const inputStyle = {
-
-padding:"18px",
-margin:"10px 0",
-borderRadius:"50px",
-border:"1px solid rgba(255,255,255,0.15)",
-background:"rgba(255,255,255,0.06)",
-color:"white",
-fontSize:"1rem",
-textAlign:"center",
-width:"100%",
-boxSizing:"border-box"
-
+          {/* CONTENU */}
+          {activeTab === 'workout' ? (
+            <div style={styles.card}>
+              <h3>Séance du jour : {getExerciseCount(day)} exercices</h3>
+              <p>Échauffement inclus : 3 exercices (Rotations, Jumping Jacks, Gainage dynamique).</p>
+              <p>Variations : Exercices adaptés selon votre progression (Cycle de 5 jours).</p>
+              <button style={{ ...styles.button, background: '#22c55e' }} onClick={() => setDay(day + 1)}>Valider la séance et passer au Jour {day + 1}</button>
+            </div>
+          ) : (
+            <div style={styles.card}>
+              <h3>Plan Nutritionnel</h3>
+              <p>{day % 2 === 0 ? "Option Sèche : Salade composée, Protéines maigres (Poulet/Poisson), Légumes verts." : "Option Prise de masse : Riz complet, Viande blanche, Avocat, Shaker de protéines."}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
+
+export default App;

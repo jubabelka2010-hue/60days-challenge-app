@@ -2,578 +2,430 @@ import React, { useState, useEffect } from 'react';
 
 function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [goal, setGoal] = useState(null); // 'perte' ou 'prise'
-  const [activeTab, setActiveTab] = useState('sport'); // 'sport' ou 'nutrition'
-  
-  // Chronomètre et Exercices
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [isChronoActive, setIsChronoActive] = useState(false);
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-
-  // E-mail de session
-  const [email, setEmail] = useState(() => localStorage.getItem('defi_current_email') || '');
+  const [email, setEmail] = useState(() => localStorage.getItem('defi_fullscreen_email') || '');
   const [inputEmail, setInputEmail] = useState('');
-
-  // États dynamiques liés à l'e-mail actif
+  
+  // États de progression
   const [currentDay, setCurrentDay] = useState(1);
-  const [selectedDay, setSelectedDay] = useState(1);
   const [calories, setCalories] = useState(0);
-  const [unlockedBadges, setUnlockedBadges] = useState(["🟢 Recrue"]);
   const [hasPaid, setHasPaid] = useState(false);
 
-  // Charger les données de l'e-mail actif
+  // Moteur du flux d'entraînement
+  // Modes : 'dashboard' | 'preparation' | 'effort' | 'rest' | 'finished'
+  const [workoutMode, setWorkoutMode] = useState('dashboard');
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [prepSeconds, setPrepSeconds] = useState(10);
+  const [restSeconds, setRestSeconds] = useState(30);
+
+  // Charger la session active
   useEffect(() => {
     if (email) {
-      const savedDay = localStorage.getItem(`${email}_day`);
-      const savedCalories = localStorage.getItem(`${email}_calories`);
-      const savedBadges = localStorage.getItem(`${email}_badges`);
-      const savedPaid = localStorage.getItem(`${email}_has_paid`);
+      const savedDay = localStorage.getItem(`${email}_fs_day`);
+      const savedCalories = localStorage.getItem(`${email}_fs_calories`);
+      const savedPaid = localStorage.getItem(`${email}_fs_paid`);
 
       setCurrentDay(savedDay ? Number(savedDay) : 1);
-      setSelectedDay(savedDay ? Number(savedDay) : 1);
       setCalories(savedCalories ? Number(savedCalories) : 0);
-      setUnlockedBadges(savedBadges ? JSON.parse(savedBadges) : ["🟢 Recrue"]);
       setHasPaid(savedPaid === 'true');
     }
   }, [email]);
 
-  // Sauvegarder les données de l'e-mail actif
+  // Sauvegarder la session active
   useEffect(() => {
     if (email) {
-      localStorage.setItem('defi_current_email', email);
-      localStorage.setItem(`${email}_day`, currentDay);
-      localStorage.setItem(`${email}_calories`, calories);
-      localStorage.setItem(`${email}_badges`, JSON.stringify(unlockedBadges));
-      localStorage.setItem(`${email}_has_paid`, hasPaid);
+      localStorage.setItem('defi_fullscreen_email', email);
+      localStorage.setItem(`${email}_fs_day`, currentDay);
+      localStorage.setItem(`${email}_fs_calories`, calories);
+      localStorage.setItem(`${email}_fs_paid`, hasPaid);
     }
-  }, [currentDay, calories, unlockedBadges, email, hasPaid]);
+  }, [currentDay, calories, email, hasPaid]);
 
-  // Logique du Chronomètre
+  // Gestionnaire du compte à rebours de préparation (10 secondes)
   useEffect(() => {
-    let interval = null;
-    if (isChronoActive && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-    } else if (timeLeft === 0 && isChronoActive) {
-      setIsChronoActive(false);
-      handleNextExercise();
+    let timer = null;
+    if (workoutMode === 'preparation' && prepSeconds > 0) {
+      timer = setInterval(() => setPrepSeconds(s => s - 1), 1000);
+    } else if (workoutMode === 'preparation' && prepSeconds === 0) {
+      setWorkoutMode('effort');
     }
-    return () => clearInterval(interval);
-  }, [isChronoActive, timeLeft]);
+    return () => clearInterval(timer);
+  }, [workoutMode, prepSeconds]);
 
+  // Gestionnaire du chronomètre de repos (30 secondes)
   useEffect(() => {
-    const handleLocationChange = () => setCurrentPath(window.location.pathname);
-    window.addEventListener('popstate', handleLocationChange);
-    return () => window.removeEventListener('popstate', handleLocationChange);
-  }, []);
+    let timer = null;
+    if (workoutMode === 'rest' && restSeconds > 0) {
+      timer = setInterval(() => setRestSeconds(s => s - 1), 1000);
+    } else if (workoutMode === 'rest' && restSeconds === 0) {
+      moveToNextExercise();
+    }
+    return () => clearInterval(timer);
+  }, [workoutMode, restSeconds]);
 
+  // Forcer la navigation fluide
   const navigateTo = (path) => {
     window.history.pushState({}, '', path);
     setCurrentPath(path);
   };
 
-  const paypalLink = "https://paypal.me/JubaBelkacemi/4.99";
-
-  const handleStartFreeTrial = (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
     const cleanEmail = inputEmail.trim().toLowerCase();
     if (!cleanEmail.includes('@')) return alert("Veuillez entrer un e-mail valide.");
     setEmail(cleanEmail);
-    navigateTo('/programme-secret');
+    navigateTo('/private-arena');
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('defi_current_email');
+    localStorage.removeItem('defi_fullscreen_email');
     setEmail('');
     setInputEmail('');
-    setGoal(null);
+    setWorkoutMode('dashboard');
     navigateTo('/');
   };
 
-  const handleExerciseDone = () => {
-    setTimeLeft(30);
-    setIsChronoActive(true);
-  };
-
-  const handleNextExercise = () => {
-    setIsChronoActive(false);
-    setCurrentExerciseIndex(prev => prev + 1);
-  };
-
-  const handleDayValidation = () => {
-    const program = get60DaysData(currentDay, goal);
-    setCalories(prev => prev + program.estimatedCalories);
-    
-    let updatedBadges = [...unlockedBadges];
-    const nextDay = currentDay + 1;
-    
-    if (nextDay >= 7 && !updatedBadges.includes("🥉 Déterminé")) updatedBadges.push("🥉 Déterminé");
-    if (nextDay >= 15 && !updatedBadges.includes("🥈 Machine")) updatedBadges.push("🥈 Machine");
-    if (nextDay >= 30 && !updatedBadges.includes("🥇 Athlète")) updatedBadges.push("🥇 Athlète");
-    if (nextDay >= 45 && !updatedBadges.includes("🔥 Inarrêtable")) updatedBadges.push("🔥 Inarrêtable");
-    if (nextDay >= 60 && !updatedBadges.includes("👑 Légende")) updatedBadges.push("👑 Légende");
-    
-    setUnlockedBadges(updatedBadges);
-    setCurrentDay(nextDay);
-    setSelectedDay(nextDay);
+  // Lancement complet de la session
+  const startFullWorkout = () => {
     setCurrentExerciseIndex(0);
-    setIsChronoActive(false);
-    
-    alert(`🏆 Journée validée ! +${program.estimatedCalories} kcal ajoutées !`);
+    setPrepSeconds(10);
+    setWorkoutMode('preparation');
   };
 
-  // --- BASE DE DONNÉES ET CARACTÉRISTIQUES PRÉCISES DES EXERCICES (Avec Simulation Visuelle CSS) ---
-  const getExerciseDetails = (name) => {
-    const details = {
-      "Pompes classiques au sol": {
-        desc: "Place tes mains au sol bien à plat, écartées à la largeur des épaules. Oriente tes coudes à 45° vers l'arrière lors de la descente. Reste parfaitement droit.",
-        animationClass: "anim-pushup"
-      },
-      "Pompes Diamant serrées": {
-        desc: "Rapproche tes mains sous la poitrine pour former un losange avec tes pouces et tes index. Descends les coudes près du corps pour cibler les triceps.",
-        animationClass: "anim-pushup-diamond"
-      },
-      "Squats classiques": {
-        desc: "Pieds écartés à la largeur des épaules. Descends les fesses vers le bas et l'arrière comme pour t'asseoir sur une chaise basse. Garde le buste fier.",
-        animationClass: "anim-squat"
-      },
-      "Squats Jumps": {
-        desc: "Descends en squat puis pousse sur tes jambes de manière explosive pour décoller du sol. Amortis ton retour en pliant immédiatement les genoux.",
-        animationClass: "anim-squat-jump"
-      },
-      "Dips sur chaise (Triceps)": {
-        desc: "Pose tes mains sur le bord d'une chaise, les fesses dans le vide. Descends verticalement en pliant tes coudes jusqu'à former un angle de 90°.",
-        animationClass: "anim-dips"
-      },
-      "Gainage Planche abdominale": {
-        desc: "Mets-toi en appui sur les avant-bras et les pointes de pieds. Aspire ton nombril vers la colonne et contracte fort tes cuisses et tes fessiers.",
-        animationClass: "anim-plank"
-      },
-      "Gainage Militaire dynamique": {
-        desc: "Démarre en planche sur les avant-bras, monte sur la main droite puis la main gauche pour finir bras tendus. Redescends et alterne.",
-        animationClass: "anim-commando"
-      },
-      "Mountain Climbers rapides": {
-        desc: "En position de pompe haute, ramène rapidement tes genoux vers ta poitrine l'un après l'autre comme si tu courais au sol. Garde le bassin stable.",
-        animationClass: "anim-climber"
-      },
-      "Fentes alternées (Cuisses)": {
-        desc: "Fais un grand pas en avant. Descends le genou arrière à ras du sol. Ta jambe avant doit former un angle droit parfait. Pousse pour revenir.",
-        animationClass: "anim-lunge"
-      },
-      "Fentes bulgares isolées": {
-        desc: "Place un pied en arrière sur une chaise. Descends tout le poids de ton corps sur ta jambe avant de manière lente et contrôlée.",
-        animationClass: "anim-bulgarian"
-      },
-      "Abdos Bicyclette": {
-        desc: "Allongé sur le dos, décolle les épaules. Amène ton coude gauche vers ton genou droit replié pendant que ta jambe gauche se tend. Alterne.",
-        animationClass: "anim-bicycle"
-      },
-      "Relevés de bassin (Glutes)": {
-        desc: "Allongé sur le dos, genoux pliés, pieds à plat. Pousse sur tes talons pour monter ton bassin vers le ciel en serrant volontairement tes fessiers.",
-        animationClass: "anim-bridge"
-      },
-      "Jumping Jacks cardio": {
-        desc: "Saute en écartant tes pieds et en touchant tes mains au-dessus de ta tête. Saute à nouveau pour refermer tes jambes et ramener tes bras.",
-        animationClass: "anim-jacks"
-      },
-      "Superman (Lombaires)": {
-        desc: "Allongé sur le ventre, bras et jambes tendus. Décolle simultanément ta poitrine et tes cuisses du sol. Bloque une seconde en haut.",
-        animationClass: "anim-superman"
-      },
-      "Burpees (Sans saut)": {
-        desc: "Accroupis-toi, lance tes pieds en arrière pour te retrouver en planche, ramène tes pieds près de tes mains et redresse-toi complètement.",
-        animationClass: "anim-burpee"
-      }
-    };
-    return details[name] || { desc: "Garde ton corps parfaitement gainé et effectue des mouvements fluides et rythmés.", animationClass: "anim-generic" };
+  const validateExerciseSeries = () => {
+    const program = getDayProgram(currentDay);
+    if (currentExerciseIndex === program.length - 1) {
+      // Fin complète de tous les exercices du jour
+      setWorkoutMode('finished');
+    } else {
+      setRestSeconds(30);
+      setWorkoutMode('rest');
+    }
   };
 
-  // --- ALGORITHME DE GÉNÉRATION DES 60 JOURS ---
-  const get60DaysData = (day, objective) => {
-    const exerciseCount = Math.min(20, 8 + Math.floor((day - 1) * 0.25));
-    const estimatedCalories = 300 + (exerciseCount * 15) + (day * 2);
+  const moveToNextExercise = () => {
+    setCurrentExerciseIndex(prev => prev + 1);
+    setPrepSeconds(10);
+    setWorkoutMode('preparation');
+  };
 
-    const movementsSport = [
-      ["Pompes classiques au sol", "12 répétitions"], 
-      ["Squats classiques", "20 répétitions"], 
-      ["Dips sur chaise (Triceps)", "12 répétitions"],
-      ["Gainage Planche abdominale", "45 secondes"], 
-      ["Mountain Climbers rapides", "40 secondes"], 
-      ["Fentes alternées (Cuisses)", "14 répétitions"],
-      ["Abdos Bicyclette", "20 répétitions"], 
-      ["Relevés de bassin (Glutes)", "15 répétitions"], 
-      ["Jumping Jacks cardio", "1 minute"],
-      ["Superman (Lombaires)", "15 répétitions"], 
-      ["Burpees (Sans saut)", "8 répétitions"], 
-      ["Squats Jumps", "10 répétitions"],
-      ["Pompes Diamant serrées", "8 répétitions"], 
-      ["Gainage Militaire dynamique", "45 secondes"], 
-      ["Fentes bulgares isolées", "10 réps / jambe"]
+  const confirmDayAndClose = () => {
+    setCalories(prev => prev + 280);
+    setCurrentDay(prev => prev + 1);
+    setWorkoutMode('dashboard');
+  };
+
+  // Base de données des exercices structurée
+  const getDayProgram = (day) => {
+    const allMovements = [
+      { name: "Pompes au sol classiques", target: "15 Répétitions", type: "pushup", setup: "Mains écartées à la largeur des épaules, alignement parfait du corps." },
+      { name: "Squats profonds", target: "20 Répétitions", type: "squat", setup: "Pieds largeur d'épaules, descendez les fesses sous la ligne des genoux." },
+      { name: "Pompes Diamant serrées", target: "10 Répétitions", type: "diamond", setup: "Mains jointes sous la poitrine formant un losange, coudes serrés." },
+      { name: "Fentes alternées dynamiques", target: "16 Répétitions", type: "lunge", setup: "Faites un grand pas en avant, fléchissez le genou arrière à 90°." },
+      { name: "Gainage Planche abdominale", target: "45 Secondes", type: "plank", setup: "Appui sur les avant-bras, contractez intensément les abdos." },
+      { name: "Mountain Climbers rapides", target: "40 Secondes", type: "climber", setup: "En position de pompe, ramenez alternativement les genoux au buste." },
+      { name: "Dips arrière sur support", target: "12 Répétitions", type: "dips", setup: "Mains sur le bord d'un appui, descendez les fesses verticalement." },
+      { name: "Squats Jumps explosifs", target: "12 Répétitions", type: "jump", setup: "Effectuez un squat complet puis sautez de façon explosive." },
+      { name: "Superman extension dorsale", target: "15 Répétitions", type: "superman", setup: "Allongé sur le ventre, décollez simultanément le buste et les cuisses." },
+      { name: "Burpees d'élite", target: "8 Répétitions", type: "burpee", setup: "Basculez au sol en planche, ramenez les pieds et redressez-vous." }
     ];
 
-    const matins = ["Omelette 3 œufs aux épinards + Thé vert", "Fromage blanc 0%, éclats d'amandes + 1 Pomme", "Pancakes à la farine d'avoine maison + Filet de miel", "Œufs brouillés, 1/2 avocat + Café noir", "Bol de pudding de chia au lait d'amande + 1 Banane"];
-    const midisPerte = ["Émincé de poulet grillé, haricots verts vapeur, filet d'huile d'olive", "Pavé de saumon sauvage saisi au citron et asperges vertes", "Salade de thon au naturel, œufs durs, concombres et tomates cerises"];
-    const midisPrise = ["Steak haché de bœuf 5%, 150g de riz basmati pesé cuit, avocat entier", "Filet de saumon, 180g de quinoa gourmand, têtes de brocolis", "Escalope de dinde rôtie, pâtes complètes al dente, copeaux de parmesan"];
-    const soirsPerte = ["Velouté maison de légumes de saison et blancs de poulet cubes", "Dos de cabillaud poché, tombée d'épinards frais à l'ail", "Omelette de 3 blancs d'œufs et herbes fines, salade verte"];
-    const soirsPrise = ["Colin d'Alaska à la vapeur, 120g de riz complet, courgettes sautées", "Filet de poulet tendre, lentilles corail mijotées, huile de lin", "Omelette complète aux champignons, 3 tranches de pain de seigle"];
-    const mentals = ["💧 Fixe-toi pour objectif de boire 2.5L d'eau pure aujourd'hui.", "📱 Éteins tous tes écrans connectés au moins 1h avant ton coucher.", "🚶‍♂️ Prends le temps de faire 15 min de marche active après ton repas.", "🧘 Prends une pause de 5 min pour faire de la respiration ventrale calme."];
-
-    let exercises = [];
-    for (let i = 0; i < exerciseCount; i++) {
-      const moveIndex = (day + i * 3) % movementsSport.length;
-      exercises.push(movementsSport[moveIndex]);
+    // Génère une rotation cohérente de 10 mouvements selon le jour choisi
+    let list = [];
+    for (let i = 0; i < 10; i++) {
+      let idx = (day + i) % allMovements.length;
+      list.push(allMovements[idx]);
     }
-
-    return {
-      matin: matins[day % matins.length],
-      midi: objective === 'perte' ? midisPerte[day % midisPerte.length] : midisPrise[day % midisPrise.length],
-      soir: objective === 'perte' ? soirsPerte[day % soirsPerte.length] : soirsPrise[day % soirsPrise.length],
-      exercises,
-      bonus: mentals[day % mentals.length],
-      estimatedCalories
-    };
+    return list;
   };
 
-  // --- DESIGN SYSTEM & INJECTION DES FEUILLES DE STYLE ANIMÉES ---
+  // Injection immédiate des styles CSS réinitialisant l'écran du navigateur pour un plein écran absolu
   useEffect(() => {
     const styleSheet = document.createElement("style");
     styleSheet.innerText = `
-      @keyframes floatGym1 { 0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.04; } 50% { transform: translate(40px, -30px) scale(1.1); opacity: 0.08; } }
-      @keyframes floatGym2 { 0%, 100% { transform: translate(0, 0) scale(1.1); opacity: 0.06; } 50% { transform: translate(-30px, 40px) scale(0.95); opacity: 0.03; } }
-      @keyframes pushupAnimation { 0%, 100% { transform: translateY(0px) scaleX(1); } 50% { transform: translateY(50px) scaleX(1.05); } }
-      @keyframes squatAnimation { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.55); } }
-      @keyframes jumpAnimation { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(20px) scaleY(0.85); } 60% { transform: translateY(-90px) scaleY(1.1); } }
-      @keyframes climberAnimation { 0%, 100% { transform: translateX(-15px) rotate(-5deg); } 50% { transform: translateX(15px) rotate(5deg); } }
-      
-      body { margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Poppins', system-ui, sans-serif; overflow-x: hidden; }
-      .app-fullscreen-container { min-height: 100vh; width: 100vw; display: flex; flex-direction: column; position: relative; box-sizing: border-box; background: #fafafa; overflow: hidden; }
-      
-      .bg-silhouette-1 { position: absolute; top: 15%; left: 5%; width: 350px; height: 350px; background: url('https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=600') no-repeat center/cover; filter: grayscale(100%) blur(8px); border-radius: 50%; pointer-events: none; animation: floatGym1 12s infinite ease-in-out; }
-      .bg-silhouette-2 { position: absolute; bottom: 10%; right: 5%; width: 400px; height: 400px; background: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=600') no-repeat center/cover; filter: grayscale(100%) blur(12px); border-radius: 50%; pointer-events: none; animation: floatGym2 16s infinite ease-in-out; }
-      
-      .content-fullscreen-wrapper { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; max-width: 900px; margin: 0 auto; padding: 40px 24px; z-index: 10; box-sizing: border-box; }
-      
-      .giant-visual-display { width: 100%; height: 320px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 24px; display: flex; align-items: center; justify-content: center; position: relative; margin: 25px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.02); overflow: hidden; }
-      .giant-avatar-core { width: 140px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 20px; position: relative; box-shadow: 0 10px 25px rgba(29, 78, 216, 0.3); }
-      
-      .anim-pushup .giant-avatar-core { animation: pushupAnimation 2s infinite ease-in-out; }
-      .anim-pushup-diamond .giant-avatar-core { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); animation: pushupAnimation 1.4s infinite ease-in-out; width: 110px; }
-      .anim-squat .giant-avatar-core { width: 50px; height: 110px; transform-origin: bottom; animation: squatAnimation 2.2s infinite ease-in-out; }
-      .anim-squat-jump .giant-avatar-core { width: 50px; height: 110px; transform-origin: bottom; animation: jumpAnimation 1.8s infinite ease-in-out; background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%); }
-      .anim-climber .giant-avatar-core { width: 120px; height: 45px; animation: climberAnimation 0.5s infinite linear; background: linear-gradient(135deg, #eab308 0%, #a16207 100%); }
-      .anim-plank .giant-avatar-core { width: 160px; height: 30px; background: linear-gradient(135deg, #10b981 0%, #047857 100%); }
-      .anim-generic .giant-avatar-core { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #64748b 0%, #334155 100%); animation: pushupAnimation 2.5s infinite ease-in-out; }
-      
-      .food-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 24px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.01); display: flex; align-items: center; gap: 20px; width: 100%; box-sizing: border-box; }
-      
-      .btn-premium-cta { background: #0f172a; color: white; border: none; padding: 18px 36px; border-radius: 50px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.2s ease; width: 100%; text-align: center; box-shadow: 0 10px 20px rgba(15,23,42,0.15); }
-      .btn-premium-cta:hover { transform: translateY(-2px); box-shadow: 0 15px 25px rgba(15,23,42,0.25); }
-      
-      .nav-pill-box { display: flex; gap: 10px; background: #e2e8f0; padding: 6px; border-radius: 50px; width: 100%; max-width: 500px; margin: 0 auto 30px auto; }
-      .nav-pill-btn { flex: 1; border: none; padding: 12px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 0.95rem; background: transparent; color: #64748b; }
-      .nav-pill-btn.active { background: white; color: #0f172a; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+        background-color: #090d16;
+        font-family: 'Poppins', -apple-system, sans-serif;
+      }
+
+      /* Styles des Personnages Articulés CSS */
+      .character-container {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        margin: 0 auto;
+      }
+
+      /* Base anatomique du coach virtuel */
+      .head { width: 30px; height: 30px; background: #e0a96d; border-radius: 50%; position: absolute; left: 85px; top: 30px; }
+      .torso { width: 16px; height: 65px; background: #3b82f6; position: absolute; left: 92px; top: 62px; border-radius: 8px; transform-origin: top center; }
+      .arm-left { width: 10px; height: 50px; background: #2563eb; position: absolute; left: 84px; top: 64px; border-radius: 5px; transform-origin: top center; }
+      .arm-right { width: 10px; height: 50px; background: #2563eb; position: absolute; left: 106px; top: 64px; border-radius: 5px; transform-origin: top center; }
+      .leg-left { width: 12px; height: 60px; background: #1e3a8a; position: absolute; left: 88px; top: 124px; border-radius: 6px; transform-origin: top center; }
+      .leg-right { width: 12px; height: 60px; background: #1e3a8a; position: absolute; left: 100px; top: 124px; border-radius: 6px; transform-origin: top center; }
+
+      /* Animation Spécifique : Pompes */
+      @keyframes pushupMotion {
+        0%, 100% { transform: translateY(0) rotate(-75deg); }
+        50% { transform: translateY(35px) rotate(-85deg); }
+      }
+      .anim-body-pushup { transform: rotate(75deg); position: absolute; top: -10px; left: 30px; animation: pushupMotion 2s infinite ease-in-out; }
+
+      /* Animation Spécifique : Squat */
+      @keyframes torsoSquat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(40px); } }
+      @keyframes legsSquat { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.5); } }
+      .anim-torso-squat { animation: torsoSquat 2s infinite ease-in-out; }
+      .anim-legs-squat { animation: legsSquat 2s infinite ease-in-out; }
+
+      /* Animation Spécifique : Climber */
+      @keyframes legClimb { 0%, 100% { transform: rotate(15deg); } 50% { transform: rotate(-45deg); } }
+      .anim-leg-climb-1 { animation: legClimb 0.6s infinite linear; }
+      .anim-leg-climb-2 { animation: legClimb 0.6s infinite linear reverse; }
     `;
     document.head.appendChild(styleSheet);
     return () => document.head.removeChild(styleSheet);
   }, []);
 
-  // --- ESPACE PRIVÉ MEMBRE (PLEIN ÉCRAN) ---
-  if (currentPath === '/programme-secret') {
-    if (!email) {
+  // Composant interne générant les animations anatomiques épurées selon l'exercice en cours
+  const RenderCoachAnimation = ({ type }) => {
+    if (type === 'pushup' || type === 'diamond') {
       return (
-        <div className="app-fullscreen-container" style={{ justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <h2 style={{ color: '#ef4444', fontSize: '2rem' }}>🔒 Session expirée</h2>
-            <button onClick={() => navigateTo('/')} className="btn-premium-cta" style={{ marginTop: '20px' }}>Retourner à l'accueil</button>
+        <div className="character-container" style={{ transform: 'rotate(-10deg) scale(1.2)' }}>
+          <div className="anim-body-pushup">
+            <div className="head" style={{ left: '140px', top: '20px' }}></div>
+            <div className="torso" style={{ left: '80px', top: '30px', width: '60px', height: '18px', transform: 'none' }}></div>
+            <div className="leg-left" style={{ left: '20px', top: '32px', width: '65px', height: '14px', transform: 'none' }}></div>
+            <div className="arm-left" style={{ left: '120px', top: '45px', width: '12px', height: '40px', transform: 'none' }}></div>
           </div>
+          <div style={{ position: 'absolute', bottom: '50px', width: '100%', height: '4px', background: '#475569' }}></div>
         </div>
       );
     }
 
-    const isDayLocked = selectedDay > 7 && !hasPaid;
-    const program = goal ? get60DaysData(selectedDay, goal) : null;
+    if (type === 'squat' || type === 'jump' || type === 'lunge') {
+      return (
+        <div className="character-container" style={{ transform: 'scale(1.2)' }}>
+          <div className="anim-torso-squat" style={{ position: 'relative', zIndex: 2 }}>
+            <div className="head" style={{ top: '10px' }}></div>
+            <div className="torso" style={{ top: '42px' }}></div>
+            <div className="arm-left" style={{ top: '45px', transform: 'rotate(-45deg)' }}></div>
+          </div>
+          <div className="anim-legs-squat" style={{ position: 'absolute', top: '105px', width: '100%', height: '80px', transformOrigin: 'bottom center' }}>
+            <div className="leg-left" style={{ top: '0', left: '88px' }}></div>
+            <div className="leg-right" style={{ top: '0', left: '100px' }}></div>
+          </div>
+          <div style={{ position: 'absolute', bottom: '15px', left: '50px', width: '100px', height: '4px', background: '#475569' }}></div>
+        </div>
+      );
+    }
 
+    // Par défaut / Mouvements de type cardio/gainage alterné
     return (
-      <div className="app-fullscreen-container">
-        {/* Silhouettes de fond dynamiques */}
-        <div className="bg-silhouette-1"></div>
-        <div className="bg-silhouette-2"></div>
-
-        {/* HEADER DE NAVIGATION PRO SUR TOUTE LA LARGEUR */}
-        <header style={{ width: '100%', borderBottom: '1px solid #e2e8f0', padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', zIndex: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a', letterSpacing: '-0.5px' }}>🏆 DÉFI 60 JOURS</span>
-            <span style={{ background: '#f1f5f9', color: '#475569', padding: '4px 12px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: '500' }}>Athlète : {email}</span>
+      <div className="character-container" style={{ transform: 'scale(1.2)' }}>
+        <div style={{ transform: 'rotate(75deg)', position: 'absolute', top: '20px', left: '30px' }}>
+          <div className="head" style={{ left: '130px', top: '20px' }}></div>
+          <div className="torso" style={{ left: '75px', top: '28px', width: '60px', height: '18px' }}></div>
+          <div className="arm-left" style={{ left: '115px', top: '44px', width: '12px', height: '35px' }}></div>
+          <div className="anim-leg-climb-1" style={{ position: 'absolute', left: '20px', top: '28px', transformOrigin: 'right center' }}>
+            <div className="leg-left" style={{ left: 0, top: 0, width: '55px', height: '14px' }}></div>
           </div>
-          <button onClick={handleLogout} style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '8px 18px', borderRadius: '50px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s' }}>Déconnexion</button>
-        </header>
-
-        {/* ZONE DE CONTENU PRINCIPALE - FORMAT CONCENTRÉ PLEIN ÉCRAN */}
-        <div className="content-fullscreen-wrapper">
-          
-          {/* SÉLECTEUR DE JOURS - FORMAT BARRE HORIZONTALE PRO */}
-          {(!program || (activeTab === 'nutrition' || currentExerciseIndex >= program.exercises.length)) && (
-            <div style={{ width: '100%', marginBottom: '35px' }}>
-              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>
-                {Array.from({ length: 60 }, (_, i) => i + 1).map((dayNum) => {
-                  const isLocked = dayNum > 7 && !hasPaid;
-                  const isCurrent = dayNum === currentDay;
-                  const isSelected = dayNum === selectedDay;
-                  return (
-                    <button
-                      key={dayNum}
-                      onClick={() => { setSelectedDay(dayNum); setCurrentExerciseIndex(0); setIsChronoActive(false); }}
-                      style={{
-                        padding: '12px 24px', borderRadius: '50px',
-                        border: isSelected ? '2px solid #0f172a' : '1px solid #e2e8f0',
-                        background: isLocked ? '#f1f5f9' : isCurrent ? '#10b981' : isSelected ? '#0f172a' : '#ffffff',
-                        color: isLocked ? '#94a3b8' : isCurrent || isSelected ? '#ffffff' : '#0f172a',
-                        fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s'
-                      }}
-                    >
-                      {isLocked ? `🔒 Jour ${dayNum}` : `Jour ${dayNum}`}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TABLEAU DE BORD DES STATISTIQUES GLOBAL */}
-          <div style={{ width: '100%', display: 'flex', gap: '20px', marginBottom: '30px' }}>
-            <div style={{ flex: 1, background: '#ffffff', border: '1px solid #e2e8f0', padding: '20px', borderRadius: '20px', textAlign: 'center' }}>
-              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600', display: 'block', marginBottom: '4px' }}>ÉNERGIE BRÛLÉE ACTIVÉE</span>
-              <strong style={{ fontSize: '1.8rem', color: '#f43f5e', fontWeight: '800' }}>{calories} kcal</strong>
-            </div>
-            <div style={{ flex: 1, background: '#ffffff', border: '1px solid #e2e8f0', padding: '20px', borderRadius: '20px', textAlign: 'center' }}>
-              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600', display: 'block', marginBottom: '4px' }}>AVANCEMENT PROGRAMME</span>
-              <strong style={{ fontSize: '1.8rem', color: '#10b981', fontWeight: '800' }}>Progression J-{currentDay}</strong>
-            </div>
+          <div className="anim-leg-climb-2" style={{ position: 'absolute', left: '20px', top: '34px', transformOrigin: 'right center' }}>
+            <div className="leg-right" style={{ left: 0, top: 0, width: '55px', height: '14px', background: '#3b82f6' }}></div>
           </div>
+        </div>
+        <div style={{ position: 'absolute', bottom: '45px', width: '100%', height: '4px', background: '#475569' }}></div>
+      </div>
+    );
+  };
 
-          {/* AFFICHAGE DES PAGES UNIQUES DYNAMIQUES */}
-          {isDayLocked ? (
-            /* PAGE UNIQUE : WALL DE PAIEMENT */
-            <div style={{ width: '100%', background: '#ffffff', border: '1px solid #e2e8f0', padding: '40px', borderRadius: '32px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.02)' }}>
-              <span style={{ fontSize: '3rem' }}>💎</span>
-              <h3 style={{ color: '#0f172a', fontSize: '1.8rem', margin: '15px 0 10px 0', fontWeight: '800' }}>Débloquez l'accès Premium Intégral</h3>
-              <p style={{ color: '#475569', fontSize: '1.05rem', lineHeight: '1.6', maxWidth: '600px', margin: '0 auto 30px auto' }}>
-                Félicitations pour vos 7 premiers jours ! Pour continuer les 60 jours en profitant de l'interface plein écran, des animations d'exercices isolés et des fiches nutrition, débloquez l'accès complet.
-              </p>
-              <div style={{ maxWidth: '350px', margin: '0 auto' }}>
-                <a href={paypalLink} target="_blank" rel="noopener noreferrer" className="btn-premium-cta" style={{ display: 'block', textDecoration: 'none', marginBottom: '15px', background: '#2563eb' }}>
-                  Acheter le Pass Unique (4,99 €)
-                </a>
-                <button onClick={() => setHasPaid(true)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '0.75rem' }}>[ Simuler la validation de l'achat ]</button>
-              </div>
-            </div>
-          ) : !goal ? (
-            /* PAGE UNIQUE : SÉLECTION DE L'OBJECTIF PHYSIQUE */
-            <div style={{ width: '100%', textAlign: 'center' }}>
-              <h3 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>Définissez votre cap pour le Jour {selectedDay}</h3>
-              <p style={{ color: '#64748b', marginBottom: '30px' }}>Les exercices et plans de nutrition s'adaptent instantanément à votre métabolisme.</p>
-              <div style={{ display: 'flex', gap: '20px', width: '100%', maxWidth: '600px', margin: '0 auto' }}>
-                <button onClick={() => setGoal('perte')} className="btn-premium-cta" style={{ background: '#f43f5e', flex: 1 }}>🔥 Sèche / Perte de Poids</button>
-                <button onClick={() => setGoal('prise')} className="btn-premium-cta" style={{ background: '#2563eb', flex: 1 }}>💪 Volume / Prise de Muscle</button>
-              </div>
-            </div>
-          ) : (
-            /* MODE RUNNING : ENTRAÎNEMENT OU NUTRITION */
-            <div style={{ width: '100%' }}>
-              
-              {/* ONGLET DE SÉLECTION APPARENT UNIQUEMENT SI SÉANCE NON LANCÉE */}
-              {currentExerciseIndex >= program.exercises.length && (
-                <div className="nav-pill-box">
-                  <button onClick={() => setActiveTab('sport')} className={`nav-pill-btn ${activeTab === 'sport' ? 'active' : ''}`}>🏋️ Entraînement Focus</button>
-                  <button onClick={() => setActiveTab('nutrition')} className={`nav-pill-btn ${activeTab === 'nutrition' ? 'active' : ''}`}>🍏 Nutrition Pro</button>
-                </div>
-              )}
+  // Styles CSS en ligne structurants pour garantir l'absence totale de blancs autour
+  const screenWrapperStyle = {
+    width: '100vw',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    boxSizing: 'border-box',
+    margin: 0,
+    padding: '40px 20px',
+    background: 'linear-gradient(rgba(11, 18, 32, 0.82), rgba(15, 23, 42, 0.95)), url("https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=1600") no-repeat center center/cover',
+    color: '#ffffff',
+    textAlign: 'center'
+  };
 
-              {activeTab === 'nutrition' && currentExerciseIndex >= program.exercises.length ? (
-                /* ==================== PAGE NUTRITION 100% UNIQUE ==================== */
-                <div style={{ width: '100%', animation: 'fadeIn 0.4s ease' }}>
-                  <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                    <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>Plan de Nutrition Idéal</h2>
-                    <p style={{ color: '#64748b' }}>Ajusté spécifiquement pour vos besoins de la journée {selectedDay}</p>
-                  </div>
-
-                  <div className="food-card">
-                    <div style={{ fontSize: '2rem', background: '#fef3c7', padding: '15px', borderRadius: '16px' }}>🥞</div>
-                    <div>
-                      <strong style={{ display: 'block', fontSize: '1.1rem', color: '#0f172a', marginBottom: '4px' }}>Repas du Matin / Petit-Déjeuner</strong>
-                      <span style={{ color: '#475569', fontSize: '1rem', lineHeight: '1.5' }}>{program.matin}</span>
-                    </div>
-                  </div>
-
-                  <div className="food-card">
-                    <div style={{ fontSize: '2rem', background: '#dbeafe', padding: '15px', borderRadius: '16px' }}>☀️</div>
-                    <div>
-                      <strong style={{ display: 'block', fontSize: '1.1rem', color: '#0f172a', marginBottom: '4px' }}>Déjeuner de Mi-Journée</strong>
-                      <span style={{ color: '#475569', fontSize: '1rem', lineHeight: '1.5' }}>{program.midi}</span>
-                    </div>
-                  </div>
-
-                  <div className="food-card">
-                    <div style={{ fontSize: '2rem', background: '#e0f2fe', padding: '15px', borderRadius: '16px' }}>🌙</div>
-                    <div>
-                      <strong style={{ display: 'block', fontSize: '1.1rem', color: '#0f172a', marginBottom: '4px' }}>Dîner de Fin de Journée</strong>
-                      <span style={{ color: '#475569', fontSize: '1rem', lineHeight: '1.5' }}>{program.soir}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', borderLeft: '4px solid #3b82f6', marginTop: '25px', color: '#334155', fontSize: '0.95rem' }}>
-                    <strong>💡 Objectif Mental Complémentaire :</strong> {program.bonus}
-                  </div>
-
-                  <div style={{ textAlign: 'center', marginTop: '30px' }}>
-                    <button onClick={() => setGoal(null)} style={{ background: 'none', border: 'none', color: '#64748b', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.9rem' }}>Changer d'objectif métabolique</button>
-                  </div>
-                </div>
-              ) : (
-                /* ==================== PAGE EXERCICE FOCUS UNIQUE ==================== */
-                <div style={{ width: '100%' }}>
-                  {currentExerciseIndex < program.exercises.length ? (
-                    <div style={{ width: '100%' }}>
-                      
-                      {isChronoActive ? (
-                        /* SOUS-PAGE : REPOS EN PLEIN ÉCRAN */
-                        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                          <span style={{ fontSize: '1rem', color: '#d97706', fontWeight: 'bold', letterSpacing: '2px' }}>RÉCUPÉRATION EN COURS</span>
-                          <p style={{ fontSize: '7rem', fontWeight: '900', color: '#d97706', margin: '15px 0', cubicBezier: 'linear' }}>{timeLeft}s</p>
-                          
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '40px' }}>
-                            <button onClick={() => setTimeLeft(prev => prev + 10)} style={{ padding: '12px 24px', borderRadius: '50px', border: '1px solid #d97706', background: 'transparent', color: '#d97706', fontWeight: 'bold', cursor: 'pointer' }}>+ 10s Repos</button>
-                            <button onClick={() => setTimeLeft(prev => Math.max(0, prev - 10))} style={{ padding: '12px 24px', borderRadius: '50px', border: '1px solid #d97706', background: 'transparent', color: '#d97706', fontWeight: 'bold', cursor: 'pointer' }}>- 10s Repos</button>
-                          </div>
-                          
-                          <button onClick={handleNextExercise} className="btn-premium-cta" style={{ background: '#d97706', maxWidth: '400px' }}>Ignorer le repos & passer à la suite →</button>
-                        </div>
-                      ) : (
-                        /* LA PAGE UNIQUE DE L'EXERCICE TOTAL */
-                        <div style={{ width: '100%', animation: 'fadeIn 0.3s ease' }}>
-                          
-                          {/* INFOS HAUT DE PAGE */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                            <span style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: 'bold', letterSpacing: '1px' }}>MOUVEMENT TECHNIQUE {currentExerciseIndex + 1} / {program.exercises.length}</span>
-                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>SESSION JOUR {selectedDay}</span>
-                          </div>
-
-                          {/* NOM DE L'EXERCICE GÉANT */}
-                          <h1 style={{ fontSize: '2.5rem', color: '#0f172a', margin: '0 0 10px 0', fontWeight: '900', letterSpacing: '-0.5px' }}>
-                            {program.exercises[currentExerciseIndex][0]}
-                          </h1>
-
-                          {/* CADRE REPETITIONS ET CADENCE */}
-                          <div style={{ background: '#eff6ff', color: '#1e40af', padding: '10px 20px', borderRadius: '50px', display: 'inline-block', fontWeight: 'bold', fontSize: '1.05rem', marginBottom: '20px' }}>
-                            🎯 Objectif d'effort : {program.exercises[currentExerciseIndex][1]}
-                          </div>
-
-                          {/* DÉMONSTRATION VISUELLE ANIMÉE GRANDE TAILLE */}
-                          <div className={`giant-visual-display ${getExerciseDetails(program.exercises[currentExerciseIndex][0]).animationClass}`}>
-                            <div className="giant-avatar-core"></div>
-                            <span style={{ position: 'absolute', bottom: '15px', right: '20px', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold', letterSpacing: '0.5px' }}>EXEMPLE DE CADENCE TECHNIQUE EN MOUVEMENT CONTINU</span>
-                          </div>
-
-                          {/* DESCRIPTION TEXTUELLE ET POSITIONNEMENT ANATOMIQUE EXCLUSIF */}
-                          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '24px', borderRadius: '20px', marginBottom: '35px' }}>
-                            <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '1.05rem', fontWeight: '700' }}>Instructions de placement corporel requis :</h4>
-                            <p style={{ margin: 0, color: '#475569', fontSize: '1rem', lineHeight: '1.6' }}>
-                              {getExerciseDetails(program.exercises[currentExerciseIndex][0]).desc}
-                            </p>
-                          </div>
-
-                          {/* BOUTON DE VALIDATION UNIQUE */}
-                          <button onClick={handleExerciseDone} className="btn-premium-cta" style={{ background: '#10b981', fontSize: '1.2rem', padding: '20px' }}>
-                            ✅ J'ai validé ma série avec succès
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    /* TOUT EST FINI : RETOUR À LA VALIDATION DU JOUR */
-                    <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                      <span style={{ fontSize: '3.5rem' }}>🎉</span>
-                      <h3 style={{ color: '#10b981', fontSize: '2rem', margin: '15px 0', fontWeight: '800' }}>Séance du Jour {selectedDay} Complétée !</h3>
-                      <p style={{ color: '#475569', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto 30px auto', lineHeight: '1.5' }}>Vous avez terminé avec rigueur l'ensemble des fiches d'exercices isolées prévues pour aujourd'hui.</p>
-                      
-                      {selectedDay === currentDay ? (
-                        <div style={{ maxWidth: '450px', margin: '0 auto' }}>
-                          <button onClick={handleDayValidation} className="btn-premium-cta" style={{ background: '#0f172a' }}>
-                            🏆 Enregistrer et Clôturer ma Journée (+{program.estimatedCalories} kcal)
-                          </button>
-                        </div>
-                      ) : (
-                        <p style={{ color: '#047857', background: '#ecfdf5', padding: '15px 30px', borderRadius: '50px', fontWeight: 'bold', display: 'inline-block' }}>🔍 Vous consultez l'historique archivé de cette journée.</p>
-                      )}
-
-                      <div style={{ marginTop: '25px' }}>
-                        <button onClick={() => { setCurrentExerciseIndex(0); setActiveTab('nutrition'); }} style={{ background: 'none', border: 'none', color: '#3182ce', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.95rem' }}>Consulter le plan de nutrition lié à ce jour</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+  // --- INTERFACE 1 : ÉCRAN D'ACCUEIL / CONNEXION ---
+  if (!email || currentPath === '/') {
+    return (
+      <div style={screenWrapperStyle}>
+        <div style={{ maxWidth: '500px', width: '100%' }}>
+          <span style={{ fontSize: '0.9rem', background: '#ff3e6c', color: 'white', padding: '6px 16px', borderRadius: '50px', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase' }}>Système Ultra-Focus Pro</span>
+          <h1 style={{ fontSize: '3.8rem', fontWeight: '900', margin: '20px 0 10px 0', letterSpacing: '-1.5px', lineHeight: '1' }}>Défi 60 Jours</h1>
+          <p style={{ color: '#94a3b8', fontSize: '1.2rem', marginBottom: '40px', lineHeight: '1.5' }}>Zéro distraction. Un écran exclusif par mouvement. Entraînez-vous à haute intensité.</p>
           
-          {/* LIEN DE RETOUR GÉNÉRAL SÉCURISÉ */}
-          {(currentExerciseIndex >= (program?.exercises?.length || 0)) && (
-            <button onClick={() => navigateTo('/')} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', textDecoration: 'underline', marginTop: '40px', fontSize: '0.9rem' }}>← Quitter le tableau de bord principal</button>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <input 
+              type="email" placeholder="Entrez votre e-mail de session..." required value={inputEmail}
+              onChange={(e) => setInputEmail(e.target.value)}
+              style={{ padding: '20px 30px', borderRadius: '50px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1.1rem', textAlign: 'center', outline: 'none', backdropFilter: 'blur(10px)' }}
+            />
+            <button type="submit" style={{ background: '#10b981', color: 'white', border: 'none', padding: '20px', borderRadius: '50px', fontWeight: '900', fontSize: '1.15rem', cursor: 'pointer', boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Démarrer le Défi Gratuit
+            </button>
+          </form>
+
+          {email && (
+            <button onClick={() => navigateTo('/private-arena')} style={{ background: 'none', border: 'none', color: '#3b82f6', marginTop: '25px', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline', fontSize: '0.95rem' }}>
+              ⚡ Reprendre ma session active ({email})
+            </button>
           )}
         </div>
       </div>
     );
   }
 
-  // --- VITRINE D'ACCUEIL COMPLÈTE (PLEIN ÉCRAN PREMIUM) ---
-  return (
-    <div className="app-fullscreen-container" style={{ justifyContent: 'center', alignItems: 'center' }}>
-      <div className="bg-silhouette-1"></div>
-      <div className="bg-silhouette-2"></div>
+  const program = getDayProgram(currentDay);
+  const currentEx = program[currentExerciseIndex];
 
-      <div className="content-fullscreen-wrapper" style={{ textAlign: 'center', maxWidth: '650px' }}>
-        <header style={{ marginBottom: '35px' }}>
-          <span style={{ fontSize: '1rem', background: '#e2e8f0', color: '#0f172a', padding: '6px 16px', borderRadius: '50px', fontWeight: 'bold', letterSpacing: '1px' }}>FITNESS HIGH-TECH V2</span>
-          <h1 style={{ fontSize: '3.5rem', fontWeight: '900', color: '#0f172a', margin: '15px 0 10px 0', letterSpacing: '-1.5px', lineHeight: '1.1' }}>Défi 60 Jours</h1>
-          <p style={{ color: '#475569', fontSize: '1.2rem', fontWeight: '400', maxWidth: '500px', margin: '0 auto' }}>L'application d'entraînement en immersion par écrans de focus uniques.</p>
-        </header>
+  // --- INTERFACE 2 : MODE INTERNE ENTRAÎNEMENT ---
+  if (currentPath === '/private-arena') {
+    
+    // ÉCRAN UNIQUE A : TABLEAU DE BORD DU JOUR / ENTRÉE
+    if (workoutMode === 'dashboard') {
+      return (
+        <div style={screenWrapperStyle}>
+          <div style={{ position: 'absolute', top: '30px', left: '40px', display: 'flex', gap: '15px', alignItems: 'center' }}>
+            <span style={{ fontSize: '1rem', fontWeight: 'bold', letterSpacing: '1px' }}>🏆 ARENA</span>
+            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 14px', borderRadius: '50px', fontSize: '0.8rem', color: '#94a3b8' }}>{email}</span>
+          </div>
+          <button onClick={handleLogout} style={{ position: 'absolute', top: '30px', right: '40px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#ef4444', padding: '6px 16px', borderRadius: '50px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>Quitter</button>
 
-        <main style={{ width: '100%' }}>
-          <section style={{ background: 'white', border: '1px solid #e2e8f0', padding: '35px', borderRadius: '32px', boxShadow: '0 15px 35px rgba(0,0,0,0.02)' }}>
-            <p style={{ color: '#334155', fontSize: '1.05rem', lineHeight: '1.6', marginBottom: '25px' }}>
-              Bénéficiez de <strong>7 jours d'accès gratuit immédiat</strong>. Entraînez-vous sans distraction : une seule page plein écran par mouvement avec guide rythmique dynamique automatisé.
+          <div style={{ maxWidth: '600px', width: '100%' }}>
+            <span style={{ fontSize: '1.2rem', color: '#10b981', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '2px' }}>PROCHAINE ÉTAPE DE TON ÉVOLUTION</span>
+            <h1 style={{ fontSize: '5rem', fontWeight: '900', margin: '10px 0 30px 0', letterSpacing: '-2px' }}>JOUR {currentDay}</h1>
+            
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '24px', padding: '25px', marginBottom: '40px', display: 'flex', justifyContent: 'space-around' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', fontWeight: 'bold' }}>CALORIES BRÛLÉES</span>
+                <strong style={{ fontSize: '1.8rem', color: '#ff3e6c' }}>{calories} kcal</strong>
+              </div>
+              <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', fontWeight: 'bold' }}>VOLUME SÉANCE</span>
+                <strong style={{ fontSize: '1.8rem', color: '#3b82f6' }}>10 Exercices focus</strong>
+              </div>
+            </div>
+
+            <button onClick={startFullWorkout} style={{ background: '#3b82f6', color: 'white', border: 'none', width: '100%', padding: '25px', borderRadius: '100px', fontWeight: '900', fontSize: '1.4rem', cursor: 'pointer', boxShadow: '0 15px 35px rgba(59, 130, 246, 0.4)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              🏋️ Lancer ma séance du jour
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ÉCRAN UNIQUE B : PREPARATION REQUIS (10 SECONDES AVEC GUIDAGE TECHNIQUE)
+    if (workoutMode === 'preparation') {
+      return (
+        <div style={screenWrapperStyle}>
+          <div style={{ maxWidth: '650px', width: '100%' }}>
+            <span style={{ fontSize: '1rem', color: '#ff9f43', fontWeight: 'bold', letterSpacing: '3px', textTransform: 'uppercase' }}>PRÉPARE-TOI AU SOL</span>
+            
+            <h1 style={{ fontSize: '3rem', fontWeight: '900', margin: '15px 0 5px 0' }}>{currentEx.name}</h1>
+            <p style={{ color: '#ff9f43', fontSize: '1.3rem', fontWeight: 'bold', margin: '0 0 40px 0' }}>Cible : {currentEx.target}</p>
+
+            {/* COACH VISUEL EN ACTION DÈS LA PHASE DE PRÉPARATION */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '32px', padding: '30px', marginBottom: '40px' }}>
+              <RenderCoachAnimation type={currentEx.type} />
+              <p style={{ color: '#94a3b8', fontSize: '0.95rem', maxWidth: '500px', margin: '20px auto 0 auto', lineHeight: '1.6' }}>
+                <strong>Placement :</strong> {currentEx.setup}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 'bold' }}>TOP CHRONO DANS</span>
+              <span style={{ fontSize: '5.5rem', fontWeight: '900', color: '#ffffff', lineHeight: '1' }}>{prepSeconds}s</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ÉCRAN UNIQUE C : EFFORT EN ACTION ("TOP !")
+    if (workoutMode === 'effort') {
+      return (
+        <div style={screenWrapperStyle}>
+          <div style={{ maxWidth: '650px', width: '100%' }}>
+            <span style={{ fontSize: '1.2rem', color: '#10b981', fontWeight: '900', letterSpacing: '4px' }}>🔥 TOP ! ACTION !</span>
+            <h1 style={{ fontSize: '3.5rem', fontWeight: '900', margin: '10px 0 0 0' }}>{currentEx.name}</h1>
+            <span style={{ display: 'inline-block', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '8px 24px', borderRadius: '50px', fontWeight: 'bold', fontSize: '1.2rem', marginTop: '15px', marginBottom: '35px' }}>
+              OBJECTIF À ATTEINDRE : {currentEx.target}
+            </span>
+
+            {/* RAPPEL CONTINU DU GUIDE VISUEL DE CADENCE */}
+            <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '32px', padding: '30px', marginBottom: '40px' }}>
+              <RenderCoachAnimation type={currentEx.type} />
+            </div>
+
+            <button onClick={validateExerciseSeries} style={{ background: '#10b981', color: 'white', border: 'none', width: '100%', padding: '25px', borderRadius: '100px', fontWeight: '900', fontSize: '1.4rem', cursor: 'pointer', boxShadow: '0 15px 30px rgba(16, 185, 129, 0.4)', textTransform: 'uppercase' }}>
+              ✅ J'AI TERMINÉ TOUTES MES RÉPÉTITIONS
+            </button>
+            
+            <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '20px' }}>Mouvement {currentExerciseIndex + 1} sur 10 validés aujourd'hui</p>
+          </div>
+        </div>
+      );
+    }
+
+    // ÉCRAN UNIQUE D : RÉCUPÉRATION / REPOS MUSCULAIRE
+    if (workoutMode === 'rest') {
+      return (
+        <div style={screenWrapperStyle}>
+          <div style={{ maxWidth: '500px', width: '100%' }}>
+            <span style={{ fontSize: '1rem', color: '#ff9f43', fontWeight: 'bold', letterSpacing: '2px' }}>RÉCUPÉRATION REQUIS</span>
+            <p style={{ fontSize: '8rem', fontWeight: '900', color: '#ff9f43', margin: '10px 0 20px 0', lineHeight: '1' }}>{restSeconds}s</p>
+            
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '40px' }}>
+              <button onClick={() => setRestSeconds(prev => prev + 10)} style={{ padding: '12px 24px', borderRadius: '50px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>+10s repos</button>
+              <button onClick={() => setRestSeconds(0)} style={{ padding: '12px 24px', borderRadius: '50px', border: '1px solid #ff9f43', background: '#ff9f43', color: 'black', fontWeight: 'bold', cursor: 'pointer' }}>Passer →</button>
+            </div>
+
+            <div style={{ color: '#64748b', fontSize: '0.95rem' }}>
+              Prochain exercice planifié : <strong style={{ color: 'white' }}>{program[currentExerciseIndex + 1]?.name}</strong>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ÉCRAN UNIQUE E : CLÔTURE DE LA SÉANCE
+    if (workoutMode === 'finished') {
+      return (
+        <div style={screenWrapperStyle}>
+          <div style={{ maxWidth: '550px', width: '100%' }}>
+            <span style={{ fontSize: '4rem' }}>👑</span>
+            <h1 style={{ fontSize: '3rem', fontWeight: '900', color: '#10b981', margin: '15px 0' }}>Séance du Jour {currentDay} Terminée !</h1>
+            <p style={{ color: '#94a3b8', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '40px' }}>
+              Tu as complété les 10 fiches d'exercices isolées prévues avec une exécution technique parfaite.
             </p>
 
-            <form onSubmit={handleStartFreeTrial} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <input 
-                type="email" placeholder="Saisissez votre adresse e-mail..." required value={inputEmail}
-                onChange={(e) => setInputEmail(e.target.value)}
-                style={{ padding: '18px 25px', borderRadius: '50px', border: '1px solid #cbd5e1', fontSize: '1.1rem', textAlign: 'center', outline: 'none', width: '100%', boxSizing: 'border-box', transition: 'all 0.2s' }}
-              />
-              <button type="submit" className="btn-premium-cta" style={{ background: '#10b981' }}>
-                🚀 Lancer mon Essai Gratuit & Activer le Jour 1
-              </button>
-            </form>
-          </section>
-
-          {/* REPRENDRE SA SESSION */}
-          {email && (
-            <div style={{ marginTop: '25px' }}>
-              <button onClick={() => { navigateTo('/programme-secret'); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline', fontSize: '1rem' }}>
-                ⚡ Reprendre ma session en cours ({email})
-              </button>
-            </div>
-          )}
-
-          {/* SIMULATEUR DE TEST RAPIDE */}
-          <div style={{ marginTop: '40px', opacity: 0.4 }}>
-            <button onClick={() => { setEmail('demo-fullscreen@fitness.com'); setCurrentDay(7); setSelectedDay(7); setHasPaid(false); navigateTo('/programme-secret'); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>🔧 Mode Démo rapide : Tester directement le mur de paiement du Jour 7</button>
+            <button onClick={confirmDayAndClose} style={{ background: '#ffffff', color: '#090d16', border: 'none', width: '100%', padding: '22px', borderRadius: '100px', fontWeight: '900', fontSize: '1.2rem', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              🏆 Enregistrer l'effort et fermer la journée
+            </button>
           </div>
-        </main>
-      </div>
-    </div>
-  );
+        </div>
+      );
+    }
+  }
+
+  return null;
 }
 
 export default App;
-

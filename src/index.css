@@ -1,6 +1,7 @@
 :root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --primary: #003087;
+  --paypal-bg: #ffc439;
+  --paypal-hover: #f2ba36;
   --bg: #f8fafc;
   --card-bg: #ffffff;
   --text: #0f172a;
@@ -82,29 +83,42 @@ body {
   font-size: 1.05rem;
 }
 
-.buy-button {
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  padding: 15px 30px;
-  font-size: 1.1rem;
+.payment-area {
+  margin-bottom: 20px;
+}
+
+.paypal-btn {
+  display: block;
+  text-decoration: none;
+  padding: 16px 20px;
+  font-size: 1.15rem;
   font-weight: bold;
   border-radius: 50px;
   cursor: pointer;
   width: 100%;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
+  text-align: center;
+  background-color: var(--paypal-bg);
+  color: #003087;
+  box-shadow: 0 4px 12px rgba(255, 196, 57, 0.3);
 }
 
-.buy-button:hover {
-  background-color: var(--primary-hover);
+.paypal-btn:hover {
+  background-color: var(--paypal-hover);
+  transform: translateY(-1px);
 }
 
-.success-message {
-  background-color: #f0fdf4;
-  color: #166534;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #bbf7d0;
+.cards-accepted {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.payment-note {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  margin-top: 15px;
 }
 
 .details {

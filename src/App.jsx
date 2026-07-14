@@ -7,22 +7,66 @@ function App() {
     const savedEmail = localStorage.getItem('defi_fullscreen_email');
     return savedEmail ? '/private-arena' : '/';
   });
-  
+
   const [inputEmail, setInputEmail] = useState('');
-  
+
   // États de progression globale
   const [currentDay, setCurrentDay] = useState(1);
   const [calories, setCalories] = useState(0);
 
-  // Modes : 'dashboard' | 'nutrition' | 'preparation' | 'effort' | 'rest' | 'finished'
+  // Modes : 'dashboard' | 'nutrition' | 'preparation' | 'effort' | 'rest' | 'finished' | 'payment'
   const [workoutMode, setWorkoutMode] = useState('dashboard');
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  
+
   // Chronomètres dynamiques
   const [prepSeconds, setPrepSeconds] = useState(10);
   const [effortSeconds, setEffortSeconds] = useState(0); // Mode temps (décompte)
   const [elapsedTime, setElapsedTime] = useState(0); // Mode répétitions (chrono ascendant)
   const [restSeconds, setRestSeconds] = useState(30);
+
+  // ===================== NOUVEAU : PROFIL UTILISATEUR =====================
+  const [profile, setProfile] = useState(null); // { weight, age, height, gender, goal }
+  const [profileForm, setProfileForm] = useState({ weight: '', age: '', height: '', gender: 'homme', goal: 'perte_poids' });
+
+  // ===================== NOUVEAU : PAIEMENT / DEBLOCAGE =====================
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const PAYWALL_DAY = 7;
+  const PAYPAL_LINK = 'https://paypal.me/JubaBelkacemi';
+
+  // ===================== NOUVEAU : BADGES =====================
+  const BADGE_DAYS = [7, 15, 20, 30, 40, 60];
+  const BADGE_LABELS = {
+    7: { icon: '🔓', label: 'Cap des 7 jours' },
+    15: { icon: '🥉', label: '15 jours de constance' },
+    20: { icon: '🥈', label: '20 jours, mental d\'acier' },
+    30: { icon: '🥇', label: 'Mi-parcours : 30 jours' },
+    40: { icon: '💎', label: '40 jours, presque au bout' },
+    60: { icon: '👑', label: 'Défi terminé !' }
+  };
+  const [badges, setBadges] = useState([]);
+
+  // ===================== NOUVEAU : SUIVI DU CLIC SUR "PAYER" =====================
+  // Le bouton "J'ai payé" ne doit apparaître qu'après que la personne ait cliqué sur "Payer"
+  const [paymentClicked, setPaymentClicked] = useState(false);
+
+  // ===================== NOUVEAU : TÂCHE MENTALE DU JOUR =====================
+  const MENTAL_TASKS = [
+    "Marche 5000 pas aujourd'hui, où que tu sois.",
+    "Pas de téléphone dans la dernière heure avant de dormir.",
+    "Bois au moins 1,5L d'eau aujourd'hui, note chaque verre.",
+    "Écris 3 choses pour lesquelles tu es reconnaissant(e).",
+    "Fais 10 minutes d'étirements avant de dormir.",
+    "Aucune boisson sucrée aujourd'hui.",
+    "Couche-toi avant 23h ce soir.",
+    "Prends 5 minutes pour respirer calmement, sans écran.",
+    "Prépare tes repas de demain à l'avance.",
+    "Fais une pause de 10 min dehors, à la lumière naturelle.",
+    "Note ton poids et une photo de progression.",
+    "Supprime les grignotages entre les repas aujourd'hui.",
+    "Range ton téléphone à un autre endroit pendant 2h.",
+    "Fais 5000 pas de plus que ta moyenne habituelle.",
+    "Dis-toi 3 fois aujourd'hui : « Je tiens mes engagements »."
+  ];
 
   // Charger les données de la session active
   useEffect(() => {
@@ -31,6 +75,18 @@ function App() {
       const savedCalories = localStorage.getItem(`${email}_fs_calories`);
       setCurrentDay(savedDay ? Number(savedDay) : 1);
       setCalories(savedCalories ? Number(savedCalories) : 0);
+
+      const savedProfile = localStorage.getItem(`${email}_fs_profile`);
+      setProfile(savedProfile ? JSON.parse(savedProfile) : null);
+
+      const savedPaid = localStorage.getItem(`${email}_fs_paid`);
+      setIsUnlocked(savedPaid === 'true');
+
+      const savedBadges = localStorage.getItem(`${email}_fs_badges`);
+      setBadges(savedBadges ? JSON.parse(savedBadges) : []);
+
+      const savedPayClicked = localStorage.getItem(`${email}_fs_pay_clicked`);
+      setPaymentClicked(savedPayClicked === 'true');
     }
   }, [email]);
 
@@ -43,6 +99,47 @@ function App() {
     }
   }, [currentDay, calories, email]);
 
+  // Sauvegarder le profil dès qu'il change
+  useEffect(() => {
+    if (email && profile) {
+      localStorage.setItem(`${email}_fs_profile`, JSON.stringify(profile));
+    }
+  }, [profile, email]);
+
+  // Sauvegarder le statut de paiement
+  useEffect(() => {
+    if (email) {
+      localStorage.setItem(`${email}_fs_paid`, isUnlocked ? 'true' : 'false');
+    }
+  }, [isUnlocked, email]);
+
+  // Sauvegarder les badges
+  useEffect(() => {
+    if (email) {
+      localStorage.setItem(`${email}_fs_badges`, JSON.stringify(badges));
+    }
+  }, [badges, email]);
+
+  // Sauvegarder le clic sur "Payer"
+  useEffect(() => {
+    if (email) {
+      localStorage.setItem(`${email}_fs_pay_clicked`, paymentClicked ? 'true' : 'false');
+    }
+  }, [paymentClicked, email]);
+
+  // Attribution automatique des badges + verrouillage au jour du paywall
+  useEffect(() => {
+    if (!email) return;
+    BADGE_DAYS.forEach((d) => {
+      if (currentDay >= d && !badges.includes(d)) {
+        setBadges((prev) => (prev.includes(d) ? prev : [...prev, d]));
+      }
+    });
+    if (currentDay >= PAYWALL_DAY && !isUnlocked && workoutMode === 'dashboard') {
+      setWorkoutMode('payment');
+    }
+  }, [currentDay, email, isUnlocked]);
+
   // Chronomètre de Préparation (10s)
   useEffect(() => {
     let timer = null;
@@ -54,7 +151,7 @@ function App() {
     return () => clearInterval(timer);
   }, [workoutMode, prepSeconds]);
 
-  const program = getDayProgram(currentDay);
+  const program = getDayProgram(currentDay, profile);
   const currentEx = program[currentExerciseIndex] || program[0];
 
   // Chronomètres d'Effort (Temps vs Répétitions)
@@ -96,7 +193,13 @@ function App() {
     if (!cleanEmail.includes('@')) return alert("Veuillez entrer un e-mail valide.");
     setEmail(cleanEmail);
     localStorage.setItem('defi_fullscreen_email', cleanEmail); // Persistance immédiate
-    navigateTo('/private-arena');
+
+    const existingProfile = localStorage.getItem(`${cleanEmail}_fs_profile`);
+    if (!existingProfile) {
+      navigateTo('/profile-setup');
+    } else {
+      navigateTo('/private-arena');
+    }
   };
 
   const handleLogout = () => {
@@ -107,7 +210,44 @@ function App() {
     navigateTo('/');
   };
 
+  // ===================== NOUVEAU : SOUMISSION DU PROFIL =====================
+  const handleProfileSubmit = (e) => {
+    e.preventDefault();
+    const w = Number(profileForm.weight);
+    const a = Number(profileForm.age);
+    const h = Number(profileForm.height);
+    if (!w || !a || !h) return alert("Merci de remplir ton poids, ton âge et ta taille.");
+    const newProfile = { weight: w, age: a, height: h, gender: profileForm.gender, goal: profileForm.goal };
+    setProfile(newProfile);
+    if (email) localStorage.setItem(`${email}_fs_profile`, JSON.stringify(newProfile));
+    navigateTo('/private-arena');
+  };
+
+  const calculateBMI = (p) => {
+    if (!p || !p.height || !p.weight) return null;
+    const heightM = p.height / 100;
+    return p.weight / (heightM * heightM);
+  };
+
+  const getBMICategory = (bmi) => {
+    if (!bmi) return 'inconnu';
+    if (bmi < 18.5) return 'maigreur';
+    if (bmi < 25) return 'normal';
+    if (bmi < 30) return 'surpoids';
+    return 'obesite';
+  };
+
+  // ===================== NOUVEAU : DEBLOCAGE PAIEMENT =====================
+  const confirmPayment = () => {
+    setIsUnlocked(true);
+    setWorkoutMode('dashboard');
+  };
+
   const startFullWorkout = () => {
+    if (currentDay >= PAYWALL_DAY && !isUnlocked) {
+      setWorkoutMode('payment');
+      return;
+    }
     setCurrentExerciseIndex(0);
     resetTimersForExercise(0);
     setWorkoutMode('preparation');
@@ -153,115 +293,224 @@ function App() {
     setWorkoutMode('dashboard');
   };
 
-  function getDayProgram(day) {
+  // ===================== ÉTENDU : PROGRAMME DE 12 EXERCICES MINIMUM =====================
+  // Pool élargi de mouvements couvrant tout le corps, avec profil d'intensité par objectif
+  function getDayProgram(day, userProfile) {
     const allMovements = [
-      { name: "Pompes Classiques", target: 15, unit: "Répétitions", mode: "reps", type: "pushup", setup: "Mains écartées, corps droit, descendez la poitrine près du sol." },
-      { name: "Mountain Climbers", target: 60, unit: "Secondes", mode: "time", type: "climber", setup: "En position de planche, ramenez alternativement vos genoux vers la poitrine." },
-      { name: "Squats Profonds", target: 20, unit: "Répétitions", mode: "reps", type: "squat", setup: "Pieds largeur d'épaules, descendez les fesses sous la ligne des genoux." },
-      { name: "Gainage Planche", target: 60, unit: "Secondes", mode: "time", type: "plank", setup: "Sur les avant-bras, contractez les abdos et fessiers, ne creusez pas le dos." },
-      { name: "Pompes Diamant", target: 10, unit: "Répétitions", mode: "reps", type: "pushup", setup: "Formez un diamant avec vos index et pouces sous votre poitrine." }
+      { name: "Pompes Classiques", base: 12, unit: "Répétitions", mode: "reps", type: "pushup", setup: "Mains écartées, corps droit, descendez la poitrine près du sol." },
+      { name: "Mountain Climbers", base: 40, unit: "Secondes", mode: "time", type: "climber", setup: "En position de planche, ramenez alternativement vos genoux vers la poitrine." },
+      { name: "Squats Profonds", base: 15, unit: "Répétitions", mode: "reps", type: "squat", setup: "Pieds largeur d'épaules, descendez les fesses sous la ligne des genoux." },
+      { name: "Gainage Planche", base: 40, unit: "Secondes", mode: "time", type: "plank", setup: "Sur les avant-bras, contractez les abdos et fessiers, ne creusez pas le dos." },
+      { name: "Pompes Diamant", base: 8, unit: "Répétitions", mode: "reps", type: "pushup", setup: "Formez un diamant avec vos index et pouces sous votre poitrine." },
+      { name: "Fentes Avant", base: 12, unit: "Répétitions (par jambe)", mode: "reps", type: "squat", setup: "Faites un grand pas en avant, descendez le genou arrière près du sol." },
+      { name: "Squat Sauté", base: 10, unit: "Répétitions", mode: "reps", type: "squat", setup: "Descendez en squat puis sautez explosivement vers le haut." },
+      { name: "Planche Latérale", base: 30, unit: "Secondes (par côté)", mode: "time", type: "plank", setup: "Sur un avant-bras, corps aligné, hanches levées." },
+      { name: "Burpees", base: 8, unit: "Répétitions", mode: "reps", type: "climber", setup: "Squat, planche, pompe, saut vertical : enchaînez le mouvement complet." },
+      { name: "Superman", base: 15, unit: "Répétitions", mode: "reps", type: "plank", setup: "Allongé sur le ventre, levez bras et jambes simultanément." },
+      { name: "Crunchs Abdominaux", base: 20, unit: "Répétitions", mode: "reps", type: "plank", setup: "Allongé sur le dos, genoux pliés, contractez les abdos vers le haut." },
+      { name: "Jumping Jacks", base: 45, unit: "Secondes", mode: "time", type: "climber", setup: "Écartez bras et jambes en sautant, revenez position de départ." },
+      { name: "Pompes Surélevées", base: 12, unit: "Répétitions", mode: "reps", type: "pushup", setup: "Mains sur un support surélevé, gardez le corps gainé." },
+      { name: "Chaise Murale", base: 35, unit: "Secondes", mode: "time", type: "squat", setup: "Dos contre un mur, cuisses parallèles au sol, tenez la position." },
+      { name: "Gainage Dynamique", base: 30, unit: "Secondes", mode: "time", type: "plank", setup: "En planche, touchez alternativement l'épaule opposée avec la main." }
     ];
-    let list = [];
-    for (let i = 0; i < 5; i++) {
-      let idx = (day + i) % allMovements.length;
-      list.push(allMovements[idx]);
+
+    // Multiplicateur d'intensité selon l'objectif choisi
+    const goalMultiplier = {
+      perte_poids: 1.15,   // plus de répétitions / cardio
+      perte_graisse: 1.2,  // le plus cardio-intensif
+      prise_masse: 0.9,    // séries plus courtes mais plus intenses/lourdes en tempo
+      maintien: 1.0
+    };
+    const goal = userProfile?.goal || 'maintien';
+    const gMult = goalMultiplier[goal] || 1.0;
+
+    // Ajustement selon l'IMC : on part plus doucement si l'IMC est élevé, pour progresser sans blessure
+    const bmi = calculateBMI(userProfile);
+    let bmiMult = 1.0;
+    if (bmi) {
+      if (bmi >= 30) bmiMult = 0.75;
+      else if (bmi >= 25) bmiMult = 0.9;
+      else if (bmi < 18.5) bmiMult = 0.85;
     }
-    return list;
+
+    // Progression de l'intensité : de +0% (jour 1) à +80% (jour 60)
+    const progressionMult = 1 + (Math.min(day, 60) - 1) * (0.8 / 59);
+
+    const totalMult = gMult * bmiMult * progressionMult;
+
+    // On sélectionne 12 mouvements différents pour la journée, en tournant dans le pool
+    const dayList = [];
+    const poolSize = allMovements.length;
+    for (let i = 0; i < 12; i++) {
+      const idx = (day - 1 + i * 3) % poolSize; // pas de 3 pour varier l'ordre jour après jour
+      const mv = allMovements[idx];
+      const scaledTarget = Math.max(5, Math.round(mv.base * totalMult));
+      dayList.push({
+        name: mv.name,
+        target: scaledTarget,
+        unit: mv.unit,
+        mode: mv.mode,
+        type: mv.type,
+        setup: mv.setup
+      });
+    }
+    return dayList;
   }
 
-  function getDayNutrition(day) {
-    const menus = [
-      {
-        breakfast: "Flocons d'avoine (60g), 1 banane, 3 œufs brouillés, Thé vert sans sucre.",
-        lunch: "Blanc de poulet grillé (150g), Quinoa (100g), Brocolis vapeur à l'huile d'olive.",
-        snack: "1 Poignée d'amandes (30g), 1 Pomme, 1 Shaker de protéines.",
-        dinner: "Pavé de saumon au four, Patates douces rôties, Grande salade verte."
-      }
+  // ===================== ÉTENDU : NUTRITION QUI CHANGE CHAQUE JOUR =====================
+  // Larges banques de repas, combinées différemment chaque jour pour ne jamais se répéter sur 60 jours
+  function getDayNutrition(day, userProfile) {
+    const breakfasts = [
+      "Flocons d'avoine (60g), 1 banane, 3 œufs brouillés, Thé vert sans sucre.",
+      "Pain complet (2 tranches), Fromage blanc (150g), Fruits rouges, Café noir.",
+      "Omelette (3 œufs), Avocat (1/2), Tomates cerises, Thé.",
+      "Smoothie protéiné (banane, lait d'amande, whey), Poignée de noix.",
+      "Pancakes à l'avoine et blancs d'œufs, Miel léger, Fruits de saison.",
+      "Yaourt grec (200g), Granola maison, Myrtilles.",
+      "Toast à l'avocat et œuf poché, Jus d'orange pressé.",
+      "Porridge au lait d'amande, Graines de chia, Compote sans sucre.",
+      "Crêpes protéinées (œufs, flocons d'avoine), Fruits frais.",
+      "Bol de fromage blanc, Amandes, Cannelle, 1 pomme."
     ];
-    return menus[(day - 1) % menus.length] || menus[0];
+    const lunches = [
+      "Blanc de poulet grillé (150g), Quinoa (100g), Brocolis vapeur à l'huile d'olive.",
+      "Filet de dinde (150g), Riz complet (100g), Haricots verts.",
+      "Saumon grillé, Patate douce rôtie, Épinards sautés.",
+      "Bœuf maigre grillé (150g), Boulgour, Poivrons rôtis.",
+      "Bowl de lentilles, Poulet effiloché, Légumes croquants.",
+      "Poisson blanc au four, Riz basmati, Courgettes vapeur.",
+      "Wrap complet au poulet et crudités, Houmous.",
+      "Steak haché 5% (150g), Purée de patate douce, Salade verte.",
+      "Cabillaud vapeur, Quinoa aux herbes, Carottes rôties.",
+      "Poulet mariné au citron, Semoule complète, Ratatouille."
+    ];
+    const snacks = [
+      "1 poignée d'amandes (30g), 1 pomme, 1 shaker de protéines.",
+      "Fromage blanc (100g), 1 poignée de noix de cajou.",
+      "1 banane, Beurre de cacahuète (1 c.à.s).",
+      "Barre protéinée maison, Thé vert.",
+      "Yaourt grec, Quelques carrés de chocolat noir 85%.",
+      "1 poignée de fruits secs, 1 œuf dur.",
+      "Smoothie vert (épinards, pomme, gingembre).",
+      "Bâtonnets de légumes, Houmous maison."
+    ];
+    const dinners = [
+      "Pavé de saumon au four, Patates douces rôties, Grande salade verte.",
+      "Blanc de poulet, Légumes vapeur (brocolis, carottes), Riz complet.",
+      "Omelette aux légumes, Salade de tomates.",
+      "Soupe de légumes maison, Œuf poché, Pain complet léger.",
+      "Poisson blanc grillé, Purée de courgettes, Quinoa.",
+      "Salade composée (thon, œuf, crudités, avoine).",
+      "Filet de poulet grillé, Poêlée de légumes verts.",
+      "Crevettes sautées, Riz complet, Légumes wok.",
+      "Dinde grillée, Ratatouille maison.",
+      "Velouté de légumes, Blanc de poulet effiloché."
+    ];
+
+    // Décalages différents pour chaque repas afin de maximiser la variété des combinaisons sur 60 jours
+    const bIdx = (day - 1) % breakfasts.length;
+    const lIdx = (day * 3 - 1) % lunches.length;
+    const sIdx = (day * 5 - 1) % snacks.length;
+    const dIdx = (day * 7 - 1) % dinners.length;
+
+    // Ajustement des portions selon l'objectif (indicatif, pas de calcul calorique médical précis)
+    const goal = userProfile?.goal || 'maintien';
+    let portionNote = '';
+    if (goal === 'prise_masse') portionNote = ' (portion augmentée + 1 collation supplémentaire recommandée)';
+    else if (goal === 'perte_poids' || goal === 'perte_graisse') portionNote = ' (portion modérée, priorité aux légumes)';
+
+    return {
+      breakfast: breakfasts[bIdx] + (goal === 'prise_masse' ? portionNote : ''),
+      lunch: lunches[lIdx] + portionNote,
+      snack: snacks[sIdx],
+      dinner: dinners[dIdx] + portionNote
+    };
   }
 
   // Injecter les styles avancés CSS pour l'ATHLÈTE ANATOMIQUE COMPLET en 3D
   useEffect(() => {
     const styleSheet = document.createElement("style");
     styleSheet.innerText = `
-      html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; background-color: #050811; font-family: 'Poppins', sans-serif; user-select: none; }
-      .canvas-3d { perspective: 1000px; width: 100%; height: 260px; display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden; background: radial-gradient(circle, rgba(30,41,59,0.2) 0%, rgba(5,8,17,0) 70%); border-radius: 20px; }
-      
-      /* Structure du Corps Humain Réaliste */
-      .human-body { position: relative; width: 120px; height: 200px; transform-style: preserve-3d; transform: rotateX(-10deg) rotateY(30deg); transition: transform 0.5s ease; }
-      .h-head { position: absolute; width: 26px; height: 32px; background: #e0a980; border-radius: 40% 40% 50% 50%; top: 0; left: 47px; box-shadow: inset -3px -3px 5px rgba(0,0,0,0.2); }
-      .h-torso { position: absolute; width: 44px; height: 65px; background: #2563eb; border-radius: 10px 10px 4px 4px; top: 34px; left: 38px; box-shadow: inset -5px -5px 10px rgba(0,0,0,0.4); }
-      .h-pelvis { position: absolute; width: 40px; height: 20px; background: #1e3a8a; border-radius: 2px 2px 8px 8px; top: 100px; left: 40px; }
-      
-      /* Membres Articulés Complexes */
-      .h-arm { position: absolute; width: 14px; height: 35px; background: #e0a980; border-radius: 7px; transform-origin: top center; }
-      .h-forearm { position: absolute; width: 12px; height: 35px; background: #e0a980; border-radius: 6px; bottom: -30px; left: 1px; transform-origin: top center; }
-      
-      .h-thigh { position: absolute; width: 16px; height: 45px; background: #1e4ed8; border-radius: 8px; transform-origin: top center; }
-      .h-shin { position: absolute; width: 13px; height: 45px; background: #e0a980; border-radius: 6px; bottom: -40px; left: 1px; transform-origin: top center; }
+html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; background-color: #050811; font-family: 'Poppins', sans-serif; user-select: none; }
+.canvas-3d { perspective: 1000px; width: 100%; height: 260px; display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden; background: radial-gradient(circle, rgba(30,41,59,0.2) 0%, rgba(5,8,17,0) 70%); border-radius: 20px; }
 
-      /* Positions initiales des membres */
-      .left-arm { top: 36px; left: 22px; }
-      .right-arm { top: 36px; left: 84px; }
-      .left-leg { top: 118px; left: 42px; }
-      .right-leg { top: 118px; left: 62px; }
+/* Structure du Corps Humain Réaliste */  
+  .human-body { position: relative; width: 120px; height: 200px; transform-style: preserve-3d; transform: rotateX(-10deg) rotateY(30deg); transition: transform 0.5s ease; }  
+  .h-head { position: absolute; width: 26px; height: 32px; background: #e0a980; border-radius: 40% 40% 50% 50%; top: 0; left: 47px; box-shadow: inset -3px -3px 5px rgba(0,0,0,0.2); }  
+  .h-torso { position: absolute; width: 44px; height: 65px; background: #2563eb; border-radius: 10px 10px 4px 4px; top: 34px; left: 38px; box-shadow: inset -5px -5px 10px rgba(0,0,0,0.4); }  
+  .h-pelvis { position: absolute; width: 40px; height: 20px; background: #1e3a8a; border-radius: 2px 2px 8px 8px; top: 100px; left: 40px; }  
+    
+  /* Membres Articulés Complexes */  
+  .h-arm { position: absolute; width: 14px; height: 35px; background: #e0a980; border-radius: 7px; transform-origin: top center; }  
+  .h-forearm { position: absolute; width: 12px; height: 35px; background: #e0a980; border-radius: 6px; bottom: -30px; left: 1px; transform-origin: top center; }  
+    
+  .h-thigh { position: absolute; width: 16px; height: 45px; background: #1e4ed8; border-radius: 8px; transform-origin: top center; }  
+  .h-shin { position: absolute; width: 13px; height: 45px; background: #e0a980; border-radius: 6px; bottom: -40px; left: 1px; transform-origin: top center; }  
 
-      /* ================= ANIMATION SQUAT REEL ================= */
-      @keyframes realSquatTorso {
-        0%, 100% { transform: translateY(0) rotateX(-10deg) rotateY(45deg); }
-        50% { transform: translateY(40px) rotateX(-25deg) rotateY(45deg); }
-      }
-      @keyframes realSquatThigh {
-        0%, 100% { transform: rotateX(0deg); }
-        50% { transform: rotateX(-75deg); }
-      }
-      @keyframes realSquatShin {
-        0%, 100% { transform: rotateX(0deg); }
-        50% { transform: rotateX(80deg); }
-      }
-      @keyframes realSquatArm {
-        0%, 100% { transform: rotateX(0deg); }
-        50% { transform: rotateX(-60deg); }
-      }
-      .anim-squat-torso { animation: realSquatTorso 2.5s infinite ease-in-out; }
-      .anim-squat-thigh { animation: realSquatThigh 2.5s infinite ease-in-out; }
-      .anim-squat-shin { animation: realSquatShin 2.5s infinite ease-in-out; }
-      .anim-squat-arm { animation: realSquatArm 2.5s infinite ease-in-out; }
+  /* Positions initiales des membres */  
+  .left-arm { top: 36px; left: 22px; }  
+  .right-arm { top: 36px; left: 84px; }  
+  .left-leg { top: 118px; left: 42px; }  
+  .right-leg { top: 118px; left: 62px; }  
 
-      /* ================= ANIMATION POMPE REELLE ================= */
-      @keyframes realPushupBody {
-        0%, 100% { transform: translateY(40px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); }
-        50% { transform: translateY(75px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); }
-      }
-      @keyframes realPushupArm {
-        0%, 100% { transform: rotateX(-20deg); }
-        50% { transform: rotateX(-85deg); }
-      }
-      @keyframes realPushupForearm {
-        0%, 100% { transform: rotateX(15deg); }
-        50% { transform: rotateX(85deg); }
-      }
-      .anim-pushup-body { animation: realPushupBody 2s infinite ease-in-out; }
-      .anim-pushup-arm { animation: realPushupArm 2s infinite ease-in-out; }
-      .anim-pushup-forearm { animation: realPushupForearm 2s infinite ease-in-out; }
+  /* ================= ANIMATION SQUAT REEL ================= */  
+  @keyframes realSquatTorso {  
+    0%, 100% { transform: translateY(0) rotateX(-10deg) rotateY(45deg); }  
+    50% { transform: translateY(40px) rotateX(-25deg) rotateY(45deg); }  
+  }  
+  @keyframes realSquatThigh {  
+    0%, 100% { transform: rotateX(0deg); }  
+    50% { transform: rotateX(-75deg); }  
+  }  
+  @keyframes realSquatShin {  
+    0%, 100% { transform: rotateX(0deg); }  
+    50% { transform: rotateX(80deg); }  
+  }  
+  @keyframes realSquatArm {  
+    0%, 100% { transform: rotateX(0deg); }  
+    50% { transform: rotateX(-60deg); }  
+  }  
+  .anim-squat-torso { animation: realSquatTorso 2.5s infinite ease-in-out; }  
+  .anim-squat-thigh { animation: realSquatThigh 2.5s infinite ease-in-out; }  
+  .anim-squat-shin { animation: realSquatShin 2.5s infinite ease-in-out; }  
+  .anim-squat-arm { animation: realSquatArm 2.5s infinite ease-in-out; }  
 
-      /* ================= ANIMATION MOUNTAIN CLIMBER ================= */
-      @keyframes climberLegL {
-        0%, 100% { transform: rotateX(-40deg); }
-        50% { transform: rotateX(-10deg); }
-      }
-      @keyframes climberLegR {
-        0%, 100% { transform: rotateX(-10deg); }
-        50% { transform: rotateX(-40deg); }
-      }
-      .anim-climber-body { transform: translateY(50px) rotateX(65deg) rotateY(0deg) rotateZ(15deg); }
-      .anim-climber-thigh-L { animation: climberLegL 0.6s infinite linear; }
-      .anim-climber-thigh-R { animation: climberLegR 0.6s infinite linear; }
+  /* ================= ANIMATION POMPE REELLE ================= */  
+  @keyframes realPushupBody {  
+    0%, 100% { transform: translateY(40px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); }  
+    50% { transform: translateY(75px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); }  
+  }  
+  @keyframes realPushupArm {  
+    0%, 100% { transform: rotateX(-20deg); }  
+    50% { transform: rotateX(-85deg); }  
+  }  
+  @keyframes realPushupForearm {  
+    0%, 100% { transform: rotateX(15deg); }  
+    50% { transform: rotateX(85deg); }  
+  }  
+  .anim-pushup-body { animation: realPushupBody 2s infinite ease-in-out; }  
+  .anim-pushup-arm { animation: realPushupArm 2s infinite ease-in-out; }  
+  .anim-pushup-forearm { animation: realPushupForearm 2s infinite ease-in-out; }  
 
-      /* Interface Utilisateur */
-      .glass-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 22px; margin-bottom: 15px; }
-    `;
+  /* ================= ANIMATION MOUNTAIN CLIMBER ================= */  
+  @keyframes climberLegL {  
+    0%, 100% { transform: rotateX(-40deg); }  
+    50% { transform: rotateX(-10deg); }  
+  }  
+  @keyframes climberLegR {  
+    0%, 100% { transform: rotateX(-10deg); }  
+    50% { transform: rotateX(-40deg); }  
+  }  
+  .anim-climber-body { transform: translateY(50px) rotateX(65deg) rotateY(0deg) rotateZ(15deg); }  
+  .anim-climber-thigh-L { animation: climberLegL 0.6s infinite linear; }  
+  .anim-climber-thigh-R { animation: climberLegR 0.6s infinite linear; }  
+
+  /* Interface Utilisateur */  
+  .glass-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 22px; margin-bottom: 15px; }  
+
+  /* Badges */
+  .badge-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 50px; padding: 8px 14px; font-size: 0.85rem; font-weight: bold; color: #e2e8f0; }
+`;
     document.head.appendChild(styleSheet);
     return () => document.head.removeChild(styleSheet);
   }, []);
@@ -358,26 +607,120 @@ function App() {
     );
   }
 
+  // --- NOUVEAU : ÉCRAN PROFIL (poids, âge, taille, sexe, objectif) ---
+  if (currentPath === '/profile-setup') {
+    return (
+      <div style={screenWrapperStyle}>
+        <div style={{ maxWidth: '500px', width: '100%' }}>
+          <h1 style={{ fontSize: '2.2rem', fontWeight: '900', marginBottom: '8px' }}>Dis-nous en plus sur toi</h1>
+          <p style={{ color: '#94a3b8', marginBottom: '30px' }}>Ces infos servent à adapter tes exercices et tes repas à ton profil.</p>
+          <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+            <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Poids (kg)</label>
+            <input type="number" min="1" value={profileForm.weight} onChange={(e) => setProfileForm({ ...profileForm, weight: e.target.value })} style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }} required />
+
+            <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Âge</label>
+            <input type="number" min="1" value={profileForm.age} onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })} style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }} required />
+
+            <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Taille (cm)</label>
+            <input type="number" min="1" value={profileForm.height} onChange={(e) => setProfileForm({ ...profileForm, height: e.target.value })} style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }} required />
+
+            <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Sexe</label>
+            <select value={profileForm.gender} onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })} style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }}>
+              <option value="homme" style={{ color: '#000' }}>Homme</option>
+              <option value="femme" style={{ color: '#000' }}>Femme</option>
+            </select>
+
+            <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Objectif</label>
+            <select value={profileForm.goal} onChange={(e) => setProfileForm({ ...profileForm, goal: e.target.value })} style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }}>
+              <option value="perte_poids" style={{ color: '#000' }}>Perte de poids</option>
+              <option value="prise_masse" style={{ color: '#000' }}>Prise de masse</option>
+              <option value="perte_graisse" style={{ color: '#000' }}>Perte de graisse</option>
+              <option value="maintien" style={{ color: '#000' }}>Se maintenir en forme</option>
+            </select>
+
+            <button type="submit" style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '18px', borderRadius: '50px', fontWeight: '900', fontSize: '1.05rem', cursor: 'pointer', textTransform: 'uppercase', marginTop: '10px' }}>Valider mon profil</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (currentPath === '/private-arena') {
-    
+
+    // --- NOUVEAU : ÉCRAN PAIEMENT (jour 7 verrouillé) ---
+    if (workoutMode === 'payment') {
+      return (
+        <div style={screenWrapperStyle}>
+          <div style={{ maxWidth: '500px', width: '100%' }}>
+            <span style={{ fontSize: '3.5rem' }}>🔒</span>
+            <h1 style={{ fontSize: '2.2rem', fontWeight: '900', margin: '15px 0' }}>Jour 7 débloqué en accès premium</h1>
+            <p style={{ color: '#94a3b8', fontSize: '1.05rem', lineHeight: '1.6', marginBottom: '30px' }}>
+              Tu as terminé les 6 premiers jours, bravo ! Pour continuer le Défi 60 Jours jusqu'au bout (séances, nutrition et badges), débloque l'accès complet pour 4,99€.
+            </p>
+            <a
+              href={PAYPAL_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setPaymentClicked(true)}
+              style={{ display: 'block', background: '#0070ba', color: 'white', textDecoration: 'none', padding: '18px', borderRadius: '50px', fontWeight: '900', fontSize: '1.1rem', marginBottom: '10px' }}
+            >
+              💳 Payer 4,99€ avec PayPal
+            </a>
+            <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '16px' }}>
+              Carte bancaire acceptée : pas besoin d'avoir un compte PayPal, choisis simplement "Payer avec une carte" sur la page suivante.
+            </p>
+
+            {paymentClicked ? (
+              <>
+                <button onClick={confirmPayment} style={{ background: 'transparent', border: '2px solid #10b981', color: '#10b981', width: '100%', padding: '16px', borderRadius: '50px', fontWeight: '900', fontSize: '1rem', cursor: 'pointer' }}>
+                  ✅ J'ai payé, débloquer mon accès
+                </button>
+                <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '18px' }}>Reviens sur cette page une fois ton paiement PayPal terminé, puis confirme ici.</p>
+              </>
+            ) : (
+              <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '10px' }}>Le bouton de confirmation apparaîtra ici juste après ton paiement.</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     // --- ÉCRAN 2 : DASHBOARD ---
     if (workoutMode === 'dashboard') {
+      const bmi = calculateBMI(profile);
+      const mentalTask = MENTAL_TASKS[(currentDay - 1) % MENTAL_TASKS.length];
       return (
         <div style={screenWrapperStyle}>
           <button onClick={handleLogout} style={{ position: 'absolute', top: '30px', right: '40px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#ef4444', padding: '6px 16px', borderRadius: '50px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Quitter</button>
 
           <div style={{ maxWidth: '600px', width: '100%' }}>
             <h1 style={{ fontSize: '5rem', fontWeight: '900', margin: '10px 0 30px 0' }}>JOUR {currentDay}</h1>
-            
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '24px', padding: '25px', marginBottom: '30px', border: '1px solid rgba(255,255,255,0.08)' }}>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '24px', padding: '25px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div><span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', fontWeight: 'bold' }}>CALORIES REÇUES</span><strong style={{ fontSize: '1.8rem', color: '#ff3e6c' }}>{calories} kcal</strong></div>
+              {bmi && <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#94a3b8' }}>IMC estimé : {bmi.toFixed(1)} ({getBMICategory(bmi)})</div>}
+            </div>
+
+            {/* NOUVEAU : Badges obtenus */}
+            {badges.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
+                {badges.map((d) => (
+                  <span key={d} className="badge-pill">{BADGE_LABELS[d]?.icon} {BADGE_LABELS[d]?.label}</span>
+                ))}
+              </div>
+            )}
+
+            {/* NOUVEAU : Tâche mentale du jour */}
+            <div className="glass-card" style={{ textAlign: 'left', marginBottom: '20px' }}>
+              <span style={{ color: '#a855f7', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>🧠 Défi mental du jour</span>
+              <p style={{ margin: 0, fontSize: '1rem', color: '#cbd5e1' }}>{mentalTask}</p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <button onClick={startFullWorkout} style={{ background: '#3b82f6', color: 'white', border: 'none', width: '100%', padding: '25px', borderRadius: '100px', fontWeight: '900', fontSize: '1.4rem', cursor: 'pointer', textTransform: 'uppercase' }}>
-                🏋️ Lancer ma séance
+                🏋️ Lancer ma séance ({program.length} exercices)
               </button>
-              
+
               <button onClick={() => setWorkoutMode('nutrition')} style={{ background: 'transparent', color: '#10b981', border: '2px solid #10b981', width: '100%', padding: '20px', borderRadius: '100px', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer', textTransform: 'uppercase' }}>
                 🍽️ Mon Plan Alimentaire du jour
               </button>
@@ -389,7 +732,7 @@ function App() {
 
     // --- ÉCRAN 3 : NUTRITION CORRIGÉ (Bouton retour opérationnel) ---
     if (workoutMode === 'nutrition') {
-      const diet = getDayNutrition(currentDay);
+      const diet = getDayNutrition(currentDay, profile);
       return (
         <div style={screenWrapperStyle}>
           <div style={{ maxWidth: '600px', width: '100%', paddingBottom: '40px' }}>
@@ -397,9 +740,9 @@ function App() {
             <button onClick={() => setWorkoutMode('dashboard')} style={{ background: 'rgba(255,255,255,0.12)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '50px', marginBottom: '30px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: '0.2s' }}>
               ← Retour au Dashboard
             </button>
-            
+
             <h2 style={{ color: '#10b981', fontSize: '2rem', marginBottom: '30px', fontWeight: '900' }}>MENU DU JOUR {currentDay}</h2>
-            
+
             <div className="glass-card">
               <span style={{ color: '#ff9f43', fontWeight: 'bold', fontSize: '0.9rem', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>🌅 Petit-déjeuner</span>
               <p style={{ margin: 0, fontSize: '1.1rem', lineHeight: '1.5', color: '#cbd5e1' }}>{diet.breakfast}</p>
@@ -429,7 +772,7 @@ function App() {
             {/* Bouton pour abandonner la séance en cours et revenir sain et sauf au dashboard */}
             <button onClick={() => setWorkoutMode('dashboard')} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#94a3b8', padding: '8px 20px', borderRadius: '50px', cursor: 'pointer', marginBottom: '15px', fontWeight: 'bold' }}>✕ Annuler la séance</button>
             <br/>
-            <span style={{ fontSize: '1rem', color: '#ff9f43', fontWeight: 'bold', letterSpacing: '3px' }}>PRÉPARATION</span>
+            <span style={{ fontSize: '1rem', color: '#ff9f43', fontWeight: 'bold', letterSpacing: '3px' }}>PRÉPARATION ({currentExerciseIndex + 1}/{program.length})</span>
             <h1 style={{ fontSize: '3rem', fontWeight: '900', margin: '15px 0 10px 0' }}>{currentEx?.name}</h1>
             <p style={{ color: '#10b981', fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 20px 0' }}>
               Objectif : {currentEx?.target} {currentEx?.unit}
@@ -453,7 +796,7 @@ function App() {
       return (
         <div style={screenWrapperStyle}>
           <div style={{ maxWidth: '650px', width: '100%' }}>
-            <span style={{ fontSize: '1.2rem', color: '#10b981', fontWeight: '900', letterSpacing: '4px' }}>🔥 ACTION !</span>
+            <span style={{ fontSize: '1.2rem', color: '#10b981', fontWeight: '900', letterSpacing: '4px' }}>🔥 ACTION ! ({currentExerciseIndex + 1}/{program.length})</span>
             <h1 style={{ fontSize: '3rem', fontWeight: '900', margin: '10px 0' }}>{currentEx?.name}</h1>
 
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '32px', padding: '20px', marginBottom: '35px' }}>

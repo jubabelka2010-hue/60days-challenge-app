@@ -10,23 +10,45 @@ function App() {
   const [isChronoActive, setIsChronoActive] = useState(false);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
 
-  // Sauvegardes
-  const [email, setEmail] = useState(() => localStorage.getItem('defi_email') || '');
+  // E-mail de session (l'identifiant unique)
+  const [email, setEmail] = useState(() => localStorage.getItem('defi_current_email') || '');
   const [inputEmail, setInputEmail] = useState('');
-  const [currentDay, setCurrentDay] = useState(() => Number(localStorage.getItem('defi_day')) || 1);
-  const [selectedDay, setSelectedDay] = useState(1);
-  const [calories, setCalories] = useState(() => Number(localStorage.getItem('defi_calories')) || 0);
-  const [unlockedBadges, setUnlockedBadges] = useState(() => JSON.parse(localStorage.getItem('defi_badges')) || ["🟢 Recrue"]);
-  const [hasPaid, setHasPaid] = useState(() => localStorage.getItem('defi_has_paid') === 'true');
 
+  // États dynamiques (chargés par rapport à l'e-mail actif)
+  const [currentDay, setCurrentDay] = useState(1);
+  const [selectedDay, setSelectedDay] = useState(1);
+  const [calories, setCalories] = useState(0);
+  const [unlockedBadges, setUnlockedBadges] = useState(["🟢 Recrue"]);
+  const [hasPaid, setHasPaid] = useState(false);
+
+  // 🔄 EFFET 1 : Charger les données spécifiques dès que l'e-mail change
   useEffect(() => {
-    localStorage.setItem('defi_day', currentDay);
-    localStorage.setItem('defi_calories', calories);
-    localStorage.setItem('defi_badges', JSON.stringify(unlockedBadges));
-    localStorage.setItem('defi_email', email);
-    localStorage.setItem('defi_has_paid', hasPaid);
+    if (email) {
+      const savedDay = localStorage.getItem(`${email}_day`);
+      const savedCalories = localStorage.getItem(`${email}_calories`);
+      const savedBadges = localStorage.getItem(`${email}_badges`);
+      const savedPaid = localStorage.getItem(`${email}_has_paid`);
+
+      setCurrentDay(savedDay ? Number(savedDay) : 1);
+      setSelectedDay(savedDay ? Number(savedDay) : 1);
+      setCalories(savedCalories ? Number(savedCalories) : 0);
+      setUnlockedBadges(savedBadges ? JSON.parse(savedBadges) : ["🟢 Recrue"]);
+      setHasPaid(savedPaid === 'true');
+    }
+  }, [email]);
+
+  // 💾 EFFET 2 : Sauvegarder automatiquement les données sous la clé de cet e-mail
+  useEffect(() => {
+    if (email) {
+      localStorage.setItem('defi_current_email', email);
+      localStorage.setItem(`${email}_day`, currentDay);
+      localStorage.setItem(`${email}_calories`, calories);
+      localStorage.setItem(`${email}_badges`, JSON.stringify(unlockedBadges));
+      localStorage.setItem(`${email}_has_paid`, hasPaid);
+    }
   }, [currentDay, calories, unlockedBadges, email, hasPaid]);
 
+  // Gestion de la navigation
   useEffect(() => {
     let interval = null;
     if (isChronoActive && timeLeft > 0) {
@@ -53,10 +75,20 @@ function App() {
 
   const handleStartFreeTrial = (e) => {
     e.preventDefault();
-    if (!inputEmail.includes('@')) return alert("Email invalide.");
-    setEmail(inputEmail);
-    setSelectedDay(currentDay);
+    const cleanEmail = inputEmail.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) return alert("Email invalide.");
+    
+    // On bascule sur la session de cet e-mail
+    setEmail(cleanEmail);
     navigateTo('/programme-secret');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('defi_current_email');
+    setEmail('');
+    setInputEmail('');
+    setGoal(null);
+    navigateTo('/');
   };
 
   const handleExerciseDone = () => {
@@ -91,13 +123,11 @@ function App() {
     alert(`🎉 Journée validée ! +${program.estimatedCalories} kcal brûlées !`);
   };
 
-  // --- ALGORITHME DE GÉNÉRATION DES 60 JOURS UNIQUES ---
+  // --- ALGORITHME DE GÉNÉRATION DES 60 JOURS ---
   const get60DaysData = (day, objective) => {
-    // Calcul progressif du nombre d'exercices : Jour 1 = 10, Jour 60 = 22
     const exerciseCount = Math.min(22, 10 + Math.floor((day - 1) * 0.21));
     const estimatedCalories = 300 + (exerciseCount * 15) + (day * 2);
 
-    // Listes de composants pour varier chaque jour
     const movementsSport = [
       ["Squats classiques", "20 réps"], ["Pompes au sol", "12 réps"], ["Dips sur chaise", "12 réps"],
       ["Gainage Planche", "45 sec"], ["Mountain Climbers", "40 sec"], ["Fentes alternées", "14 réps"],
@@ -116,7 +146,6 @@ function App() {
     const soirsPrise = ["Colin à la vapeur, 120g de riz, courgettes", "Filet de poulet, lentilles cuisinées, huile de lin", "Omelette complète, 3 tranches de pain de seigle", "Thon au naturel, pommes de terre vapeur", "Pavé de dinde, boulgour aux herbes"];
     const mentals = ["💧 Bois 2.5L d'eau aujourd'hui.", "📱 Pas d'écran 1h avant le coucher.", "🚶‍♂️ Fais 15 min de marche après manger.", "🧘 5 min de respiration profonde calme.", "💤 Va te coucher avant 22h30 ce soir."];
 
-    // Génération pseudo-aléatoire basée sur le numéro du jour pour être toujours unique mais fixe
     let exercises = [];
     for (let i = 0; i < exerciseCount; i++) {
       const moveIndex = (day + i * 3) % movementsSport.length;
@@ -135,7 +164,7 @@ function App() {
     return { menu: menuHTML, exercises, bonus: mentals[bIdx], estimatedCalories };
   };
 
-  // --- ESPACE MEMBRE ---
+  // --- PANNEAU ESPACE MEMBRE ---
   if (currentPath === '/programme-secret') {
     if (!email) {
       return (
@@ -151,9 +180,15 @@ function App() {
 
     return (
       <div className="container">
+        {/* BARRE DE STATUT DE SESSION */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 15px', borderRadius: '10px', marginBottom: '15px', border: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: '0.85rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis' }}>👤 Compte : <strong>{email}</strong></span>
+          <button onClick={handleLogout} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}>Changer de compte</button>
+        </div>
+
         {/* BARRE 60 JOURS */}
         <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-          <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px' }}>📅 Calendrier interactif (60 Jours uniques) :</p>
+          <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px' }}>📅 Calendrier interactif :</p>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }}>
             {Array.from({ length: 60 }, (_, i) => i + 1).map((dayNum) => {
               const isLocked = dayNum > 7 && !hasPaid;
@@ -178,7 +213,7 @@ function App() {
           </div>
         </div>
 
-        {/* METRICS */}
+        {/* COMPTEURS */}
         <section className="hero-card" style={{ background: '#0f172a', color: 'white', textAlign: 'left', padding: '20px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div>
@@ -255,7 +290,7 @@ function App() {
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center' }}>
-                    <h3 style={{ color: '#10b981', marginBottom: '10px' }}>🎉 Séance du Jour ${selectedDay} bouclée !</h3>
+                    <h3 style={{ color: '#10b981', marginBottom: '10px' }}>🎉 Séance du Jour {selectedDay} bouclée !</h3>
                     {selectedDay === currentDay ? (
                       <button onClick={handleDayValidation} className="paypal-btn" style={{ background: '#003087', color: 'white', width: '100%', fontSize: '1.2rem' }}>
                         🏆 Valider ma journée (+{program.estimatedCalories} kcal)
@@ -274,11 +309,11 @@ function App() {
             )}
           </div>
         )}
-        <button onClick={() => navigateTo('/')} style={{ background: 'none', border: 'none', color: '#003087', cursor: 'pointer', textDecoration: 'underline', display: 'block', width: '100%', textAlign: 'center', marginTop: '15px' }}>← Retour</button>
       </div>
     );
   }
 
+  // --- PANNEAU VITRINE D'ACCUEIL ---
   return (
     <div className="container">
       <header className="header">
@@ -302,8 +337,17 @@ function App() {
             <li>⏱️ Chronomètre intelligent réglable pour tes temps morts.</li>
           </ul>
         </section>
+
+        {email && (
+          <div style={{ textAlign: 'center', marginTop: '15px' }}>
+            <button onClick={() => navigateTo('/programme-secret')} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }}>
+              ⚡ Revenir sur la session de {email}
+            </button>
+          </div>
+        )}
+
         <div style={{ textAlign: 'center', marginTop: '25px', opacity: 0.4 }}>
-          <button onClick={() => { setEmail('test@demo.com'); setCurrentDay(7); setSelectedDay(7); setHasPaid(false); navigateTo('/programme-secret'); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem', textDecoration: 'underline' }}>🔧 Mode Démo : Voir le mur de paiement (Jour 7)</button>
+          <button onClick={() => { setEmail('test-limite@demo.com'); setCurrentDay(7); setSelectedDay(7); setHasPaid(false); navigateTo('/programme-secret'); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem', textDecoration: 'underline' }}>🔧 Mode Démo : Voir le mur de paiement (Jour 7)</button>
         </div>
       </main>
     </div>

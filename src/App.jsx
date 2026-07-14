@@ -151,6 +151,22 @@ function App() {
     return () => clearInterval(timer);
   }, [workoutMode, prepSeconds]);
 
+  const calculateBMI = (p) => {
+    if (!p || !p.height || !p.weight) return null;
+    const heightM = p.height / 100;
+    return p.weight / (heightM * heightM);
+  };
+
+  const getBMICategory = (bmi) => {
+    if (!bmi) return 'inconnu';
+    if (bmi < 18.5) return 'maigreur';
+    if (bmi < 25) return 'normal';
+    if (bmi < 30) return 'surpoids';
+    return 'obesite';
+  };
+
+  const program = getDayProgram(currentDay, profile);
+  const currentEx = program[currentExerciseIndex] || program[0];
   const program = getDayProgram(currentDay, profile);
   const currentEx = program[currentExerciseIndex] || program[0];
 
@@ -221,20 +237,6 @@ function App() {
     setProfile(newProfile);
     if (email) localStorage.setItem(`${email}_fs_profile`, JSON.stringify(newProfile));
     navigateTo('/private-arena');
-  };
-
-  const calculateBMI = (p) => {
-    if (!p || !p.height || !p.weight) return null;
-    const heightM = p.height / 100;
-    return p.weight / (heightM * heightM);
-  };
-
-  const getBMICategory = (bmi) => {
-    if (!bmi) return 'inconnu';
-    if (bmi < 18.5) return 'maigreur';
-    if (bmi < 25) return 'normal';
-    if (bmi < 30) return 'surpoids';
-    return 'obesite';
   };
 
   // ===================== NOUVEAU : DEBLOCAGE PAIEMENT =====================

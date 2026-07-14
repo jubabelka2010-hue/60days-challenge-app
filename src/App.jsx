@@ -2,165 +2,125 @@ import React, { useState, useEffect } from 'react';
 
 function App() {
   // --- ÉTATS ---
-  const [email, setEmail] = useState(() => localStorage.getItem('defi_fullscreen_email') || '');
-  const [currentPath, setCurrentPath] = useState(() => localStorage.getItem('defi_fullscreen_email') ? '/private-arena' : '/');
-  const [inputEmail, setInputEmail] = useState('');
-  
+  const [profile, setProfile] = useState(() => JSON.parse(localStorage.getItem('user_profile')) || null);
+  const [email, setEmail] = useState(() => localStorage.getItem('user_email') || '');
   const [currentDay, setCurrentDay] = useState(() => Number(localStorage.getItem('user_day')) || 1);
-  const [calories, setCalories] = useState(0);
-  const [workoutMode, setWorkoutMode] = useState('dashboard');
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  
-  const [prepSeconds, setPrepSeconds] = useState(10);
-  const [effortSeconds, setEffortSeconds] = useState(0);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [restSeconds, setRestSeconds] = useState(30);
+  const [workoutMode, setWorkoutMode] = useState(profile ? 'dashboard' : 'login');
+  const [currentExIndex, setCurrentExIndex] = useState(0);
+  const [hasPaid, setHasPaid] = useState(() => localStorage.getItem('user_paid') === 'true');
 
-  // --- LOGIQUE NUTRITION ET PROGRAMME ---
-  const getDayProgram = (day) => {
-    const allMovements = [
-      { name: "Pompes Classiques", target: 15, unit: "Répétitions", mode: "reps", type: "pushup", setup: "Mains écartées, corps droit, descendez la poitrine près du sol." },
-      { name: "Mountain Climbers", target: 60, unit: "Secondes", mode: "time", type: "climber", setup: "En position de planche, ramenez alternativement vos genoux vers la poitrine." },
-      { name: "Squats Profonds", target: 20, unit: "Répétitions", mode: "reps", type: "squat", setup: "Pieds largeur d'épaules, descendez les fesses sous la ligne des genoux." },
-      { name: "Gainage Planche", target: 60, unit: "Secondes", mode: "time", type: "plank", setup: "Sur les avant-bras, contractez les abdos et fessiers, ne creusez pas le dos." },
-      { name: "Pompes Diamant", target: 10, unit: "Répétitions", mode: "reps", type: "pushup", setup: "Formez un diamant avec vos index et pouces sous votre poitrine." }
-    ];
-    return Array.from({ length: 5 }, (_, i) => allMovements[(day + i) % allMovements.length]);
+  const PAYPAL_LINK = "https://paypal.me/JubaBelkacemi/4.99";
+
+  // --- DONNÉES ---
+  const mealPlans = [
+    { breakfast: "Flocons d'avoine & Whey", lunch: "Poulet grillé, riz complet, brocolis", dinner: "Saumon, patate douce, asperges" },
+    { breakfast: "Omelette 3 œufs, avocat", lunch: "Dinde, quinoa, épinards", dinner: "Steak haché 5%, haricots verts, amandes" },
+    { breakfast: "Yaourt grec, fruits rouges", lunch: "Thon, pâtes complètes, salade", dinner: "Cabillaud, riz basmati, courgettes" }
+  ];
+
+  const exerciseDB = [
+    { name: "Pompes", type: "reps", base: 10, step: 2, img: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ4Zndqbm05eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKMGpxxHOGTdzJC/giphy.gif" },
+    { name: "Squats", type: "reps", base: 15, step: 3, img: "https://media.giphy.com/media/l41lTjJp90Y6424e4/giphy.gif" },
+    { name: "Gainage (sec)", type: "time", base: 30, step: 2, img: "https://media.giphy.com/media/3o7TKK2a2Z1p61t47u/giphy.gif" },
+    { name: "Fentes", type: "reps", base: 10, step: 1, img: "https://media.giphy.com/media/3o7TKVUn7iM8FMEU24/giphy.gif" },
+    { name: "Mountain Climbers", type: "time", base: 30, step: 1, img: "https://media.giphy.com/media/26n6Gx9moCgs1pUuk/giphy.gif" },
+    { name: "Burpees", type: "reps", base: 5, step: 1, img: "https://media.giphy.com/media/26n6G5G6GfGk2b0pW/giphy.gif" },
+    { name: "Dips Chaise", type: "reps", base: 8, step: 1, img: "https://media.giphy.com/media/3o7TKVUn7iM8FMEU24/giphy.gif" },
+    { name: "Superman", type: "reps", base: 12, step: 1, img: "https://media.giphy.com/media/3o7TKMGpxxHOGTdzJC/giphy.gif" },
+    { name: "Jump Squats", type: "reps", base: 10, step: 1, img: "https://media.giphy.com/media/l41lTjJp90Y6424e4/giphy.gif" },
+    { name: "Planche Latérale", type: "time", base: 20, step: 1, img: "https://media.giphy.com/media/3o7TKK2a2Z1p61t47u/giphy.gif" },
+    { name: "Crunches", type: "reps", base: 20, step: 2, img: "https://media.giphy.com/media/3o7TKVUn7iM8FMEU24/giphy.gif" },
+    { name: "High Knees", type: "time", base: 30, step: 2, img: "https://media.giphy.com/media/26n6Gx9moCgs1pUuk/giphy.gif" }
+  ];
+
+  // --- LOGIQUE ---
+  const calculateCalories = () => {
+    if (!profile) return 2000;
+    const base = profile.gender === 'male' ? 88.36 + (13.4 * profile.weight) + (4.8 * profile.height) - (5.7 * profile.age) : 447.6 + (9.2 * profile.weight) + (3.1 * profile.height) - (4.3 * profile.age);
+    return Math.round(base * 1.375);
   };
 
-  const getDayNutrition = (day) => {
-    const nutritionLibrary = [
-      { breakfast: "Oatmeal & Fruits", lunch: "Poulet grillé et riz", snack: "Amandes", dinner: "Saumon et brocolis" },
-      { breakfast: "Omelette 3 œufs", lunch: "Dinde et patate douce", snack: "Yaourt grec", dinner: "Salade de thon" },
-      { breakfast: "Smoothie protéiné", lunch: "Bœuf maigre et quinoa", snack: "1 Pomme", dinner: "Soupe de légumes" }
-    ];
-    return nutritionLibrary[(day - 1) % nutritionLibrary.length];
-  };
+  const calculateIntensity = (ex) => ex.base + (currentDay * ex.step);
 
-  const program = getDayProgram(currentDay);
-  const currentEx = program[currentExerciseIndex] || program[0];
-
-  // --- EFFETS ET TIMERS ---
-  useEffect(() => {
-    let timer = null;
-    if (workoutMode === 'preparation' && prepSeconds > 0) timer = setInterval(() => setPrepSeconds(s => s - 1), 1000);
-    else if (workoutMode === 'preparation' && prepSeconds === 0) setWorkoutMode('effort');
-    return () => clearInterval(timer);
-  }, [workoutMode, prepSeconds]);
-
-  useEffect(() => {
-    let timer = null;
-    if (workoutMode === 'effort') {
-      if (currentEx.mode === 'time') {
-        if (effortSeconds > 0) timer = setInterval(() => setEffortSeconds(s => s - 1), 1000);
-        else triggerRestOrFinish();
+  const handleNextExercise = () => {
+    if (currentExIndex < exerciseDB.length - 1) {
+      setCurrentExIndex(currentExIndex + 1);
+    } else {
+      const nextDay = currentDay + 1;
+      if (nextDay > 7 && !hasPaid) {
+        setWorkoutMode('paywall');
       } else {
-        timer = setInterval(() => setElapsedTime(s => s + 1), 1000);
+        setCurrentDay(nextDay);
+        localStorage.setItem('user_day', nextDay);
+        setWorkoutMode('dashboard');
+        setCurrentExIndex(0);
       }
     }
-    return () => clearInterval(timer);
-  }, [workoutMode, effortSeconds, currentEx]);
+  };
 
   useEffect(() => {
-    let timer = null;
-    if (workoutMode === 'rest' && restSeconds > 0) timer = setInterval(() => setRestSeconds(s => s - 1), 1000);
-    else if (workoutMode === 'rest' && restSeconds === 0) moveToNextExercise();
-    return () => clearInterval(timer);
-  }, [workoutMode, restSeconds]);
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .app-container { min-height: 100vh; background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364); animation: gradient 15s ease infinite; display: flex; justify-content: center; align-items: center; padding: 20px; color: white; font-family: 'Segoe UI', sans-serif; }
+      @keyframes gradient { 0% {background-position:0% 50%} 50% {background-position:100% 50%} 100% {background-position:0% 50%} }
+      .glass-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); padding: 40px; border-radius: 40px; border: 1px solid rgba(255,255,255,0.2); width: 100%; max-width: 500px; text-align: center; }
+      .btn { background: #00d2ff; color: #000; border: none; padding: 15px 30px; border-radius: 50px; font-weight: 800; cursor: pointer; margin-top: 20px; text-decoration: none; display: inline-block; width: 100%; }
+      input { width: 90%; padding: 15px; margin: 10px 0; border-radius: 10px; border: none; }
+      img { width: 100%; height: 250px; object-fit: cover; border-radius: 20px; margin: 20px 0; }
+    `;
+    document.head.appendChild(style);
+  }, []);
 
-  // --- ACTIONS ---
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (inputEmail.includes('@')) {
-      setEmail(inputEmail);
-      localStorage.setItem('defi_fullscreen_email', inputEmail);
-      setCurrentPath('/private-arena');
-    }
-  };
-
-  const startFullWorkout = () => {
-    setCurrentExerciseIndex(0);
-    setPrepSeconds(10);
-    setRestSeconds(30);
-    setWorkoutMode('preparation');
-  };
-
-  const triggerRestOrFinish = () => {
-    if (currentExerciseIndex === program.length - 1) setWorkoutMode('finished');
-    else setWorkoutMode('rest');
-  };
-
-  const moveToNextExercise = () => {
-    setCurrentExerciseIndex(prev => prev + 1);
-    setPrepSeconds(10);
-    setRestSeconds(30);
-    setWorkoutMode('preparation');
-  };
-
-  // --- STYLES ET RENDU ---
-  const screenStyle = { 
-    width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', 
-    justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(rgba(5, 8, 17, 0.90), rgba(9, 13, 26, 0.97)), url("https://images.unsplash.com/photo-1517838277536-f5f99be501cd")', 
-    backgroundSize: 'cover', color: '#fff', textAlign: 'center', padding: '20px', overflowY: 'auto' 
-  };
-
-  // 1. PAGE DE VENTE (Landin Page)
-  if (currentPath === '/') {
-    return (
-      <div style={screenStyle}>
-        <h1 style={{ fontSize: '3.6rem' }}>Défi 60 Jours</h1>
-        <p style={{ color: '#94a3b8', marginBottom: '40px' }}>Transforme tes habitudes et atteins tes objectifs.</p>
-        <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: '400px' }}>
-          <input type="email" placeholder="Entrez votre e-mail..." onChange={(e) => setInputEmail(e.target.value)} style={{ padding: '20px', width: '100%', borderRadius: '50px', border: 'none', marginBottom: '10px' }} />
-          <button type="submit" style={{ padding: '20px', width: '100%', borderRadius: '50px', border: 'none', background: '#3b82f6', color: '#fff', fontWeight: 'bold' }}>COMMENCER LE DÉFI (4,99 €)</button>
-        </form>
-      </div>
-    );
-  }
-
-  // 2. DASHBOARD / APP
   return (
-    <div style={screenStyle}>
-      {workoutMode === 'dashboard' && (
-        <>
-          <h1>JOUR {currentDay}</h1>
-          <button onClick={startFullWorkout} style={{ padding: '20px 40px', background: '#3b82f6', border: 'none', borderRadius: '50px', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>LANCER LA SÉANCE</button>
-          <button onClick={() => setWorkoutMode('nutrition')} style={{ marginTop: '20px', background: 'transparent', color: '#10b981', border: '1px solid #10b981', padding: '15px 30px', borderRadius: '50px' }}>Mon Plan Alimentaire</button>
-        </>
-      )}
+    <div className="app-container">
+      <div className="glass-card">
+        {workoutMode === 'login' && (
+          <>
+            <h1>🔥 ELITE FIT 60</h1>
+            <input type="email" placeholder="Votre email" onChange={(e) => setEmail(e.target.value)} />
+            <select onChange={(e) => setProfile({...profile, gender: e.target.value})} style={{width: '90%', padding: '15px', borderRadius: '10px'}}>
+                <option value="male">Homme</option>
+                <option value="female">Femme</option>
+            </select>
+            <input type="number" placeholder="Âge" onChange={(e) => setProfile({...profile, age: Number(e.target.value)})} />
+            <input type="number" placeholder="Poids (kg)" onChange={(e) => setProfile({...profile, weight: Number(e.target.value)})} />
+            <input type="number" placeholder="Taille (cm)" onChange={(e) => setProfile({...profile, height: Number(e.target.value)})} />
+            <button className="btn" onClick={() => { localStorage.setItem('user_email', email); localStorage.setItem('user_profile', JSON.stringify(profile)); setWorkoutMode('dashboard'); }}>COMMENCER</button>
+          </>
+        )}
 
-      {workoutMode === 'nutrition' && (
-        <div style={{ maxWidth: '600px' }}>
-          <button onClick={() => setWorkoutMode('dashboard')}>← Retour</button>
-          <h2>Menu du jour {currentDay}</h2>
-          <p>Petit-déjeuner : {getDayNutrition(currentDay).breakfast}</p>
-          <p>Déjeuner : {getDayNutrition(currentDay).lunch}</p>
-          <p>Dîner : {getDayNutrition(currentDay).dinner}</p>
-        </div>
-      )}
+        {workoutMode === 'dashboard' && profile && (
+          <>
+            <h1>JOUR {currentDay} / 60</h1>
+            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '15px', borderRadius: '15px', margin: '20px 0' }}>
+              <h3>🎯 Ton apport : {calculateCalories()} kcal</h3>
+              <p>Petit-déj: {mealPlans[currentDay % 3].breakfast}</p>
+              <p>Déjeuner: {mealPlans[currentDay % 3].lunch}</p>
+              <p>Dîner: {mealPlans[currentDay % 3].dinner}</p>
+            </div>
+            <button className="btn" onClick={() => setWorkoutMode('active')}>DÉMARRER LA SÉANCE</button>
+          </>
+        )}
 
-      {workoutMode === 'preparation' && (
-        <div>
-          <h2>Préparation...</h2>
-          <h1>{prepSeconds}s</h1>
-          <p>{currentEx.name}</p>
-        </div>
-      )}
+        {workoutMode === 'active' && (
+          <>
+            <h3>{exerciseDB[currentExIndex].name}</h3>
+            <img src={exerciseDB[currentExIndex].img} alt="exercice" />
+            <h1 style={{fontSize: '3rem'}}>{calculateIntensity(exerciseDB[currentExIndex])} {exerciseDB[currentExIndex].type === 'reps' ? 'RÉPS' : 'SEC'}</h1>
+            <button className="btn" onClick={handleNextExercise}>EXERCICE SUIVANT ➔</button>
+          </>
+        )}
 
-      {workoutMode === 'effort' && (
-        <div>
-          <h1>{currentEx.name}</h1>
-          <p>{currentEx.mode === 'time' ? `Temps restant : ${effortSeconds}s` : `Chrono : ${elapsedTime}s`}</p>
-          <button onClick={triggerRestOrFinish}>Terminer</button>
-        </div>
-      )}
-
-      {workoutMode === 'finished' && (
-        <div>
-          <h1>Séance Terminée !</h1>
-          <button onClick={() => { setCurrentDay(d => d + 1); setWorkoutMode('dashboard'); }}>Valider le Jour {currentDay}</button>
-        </div>
-      )}
+        {workoutMode === 'paywall' && (
+          <>
+            <h1>Bravo pour ces 7 jours ! 🏆</h1>
+            <p>Accède au programme complet pour continuer jusqu'au jour 60.</p>
+            <a href={PAYPAL_LINK} target="_blank" rel="noopener noreferrer" className="btn" onClick={() => localStorage.setItem('user_paid', 'true')}>
+              PAYER 4,99 € VIA PAYPAL
+            </a>
+          </>
+        )}
+      </div>
     </div>
   );
 }

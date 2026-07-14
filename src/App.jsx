@@ -1,301 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// --- BASE DE DONNÉES MASSIVE DES EXERCICES ---
-const EXERCISES_LIBRARY = [
-  { name: "Pompes", type: "reps", target: 10, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Squats", type: "reps", target: 15, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Gainage", type: "time", target: 45, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Fentes", type: "reps", target: 12, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Mountain Climbers", type: "time", target: 30, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Dips", type: "reps", target: 10, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Burpees", type: "reps", target: 8, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Crunchs", type: "reps", target: 20, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Squat Sauté", type: "reps", target: 12, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Planche Latérale", type: "time", target: 40, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Chaise", type: "time", target: 60, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Superman", type: "reps", target: 15, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" }
-];
-
-export default function App() {
-  // --- ÉTAT GLOBAL ET PERSISTANCE ---
-  const [step, setStep] = useState(() => localStorage.getItem('app_step') || 'login');
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user_data')) || { email: '', age: '', weight: '', height: '' });
-  const [day, setDay] = useState(() => Number(localStorage.getItem('current_day')) || 1);
-  const [isPaid, setIsPaid] = useState(() => localStorage.getItem('is_paid') === 'true');
-  const [workoutMode, setWorkoutMode] = useState('prep'); // prep, active, rest, finished
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  // --- SAUVEGARDE AUTOMATIQUE ---
-  useEffect(() => {
-    localStorage.setItem('app_step', step);
-    localStorage.setItem('user_data', JSON.stringify(user));
-    localStorage.setItem('current_day', day);
-    localStorage.setItem('is_paid', isPaid);
-  }, [step, user, day, isPaid]);
-
-  // --- DESIGN PROFESSIONNEL (Overlay sombre) ---
-  const styles = {
-    screen: {
-      width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', 
-      alignItems: 'center', justifyContent: 'center', color: '#fff', textAlign: 'center',
-      background: 'linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url("https://images.unsplash.com/photo-1534438327276-14e5300c3a48")',
-      backgroundSize: 'cover', backgroundPosition: 'center', position: 'fixed', top: 0, left: 0
-    },
-    btn: { padding: '20px 50px', background: '#3b82f6', border: 'none', borderRadius: '50px', color: '#fff', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px' }
-  };
-
-  // --- LOGIQUE D'ENCHAÎNEMENT ---
-  const nextExercise = () => {
-    if (currentIndex < EXERCISES_LIBRARY.length - 1) {
-      setWorkoutMode('rest');
-      setTimeout(() => {
-        setCurrentIndex(currentIndex + 1);
-        setWorkoutMode('prep');
-      }, 30000); // Repos 30s
-    } else {
-      setStep('dashboard');
-      setDay(day + 1);
-      setCurrentIndex(0);
-    }
-  };
-
-  // --- RENDER DES ÉTAPES ---
-  if (step === 'login') return (
-    <div style={styles.screen}>
-      <h1>CONNEXION</h1>
-      <input type="email" placeholder="Email" onChange={(e) => setUser({...user, email: e.target.value})} style={{padding: '15px', borderRadius: '10px'}}/>
-      <button style={styles.btn} onClick={() => setStep('profile')}>SUIVANT</button>
-    </div>
-  );
-
-  if (step === 'profile') return (
-    <div style={styles.screen}>
-      <h1>PROFIL ATHLÈTE</h1>
-      <input type="number" placeholder="Âge" onChange={(e) => setUser({...user, age: e.target.value})} style={{margin: '10px', padding: '10px'}}/>
-      <input type="number" placeholder="Poids (kg)" onChange={(e) => setUser({...user, weight: e.target.value})} style={{margin: '10px', padding: '10px'}}/>
-      <button style={styles.btn} onClick={() => setStep('dashboard')}>CRÉER COMPTE</button>
-    </div>
-  );
-
-  if (step === 'dashboard') return (
-    <div style={styles.screen}>
-      <h1>JOUR {day}</h1>
-      {day > 7 && !isPaid ? (
-        <div>
-          <h2>Programme verrouillé</h2>
-          <button style={styles.btn} onClick={() => window.open('https://paypal.me/JubaBelkacemi', '_blank')}>PAYER 4,99 €</button>
-        </div>
-      ) : (
-        <button style={styles.btn} onClick={() => setStep('workout')}>LANCER SÉANCE</button>
-      )}
-    </div>
-  );
-
-  if (step === 'workout') {
-    const ex = EXERCISES_LIBRARY[currentIndex];
-    return (
-      <div style={styles.screen}>
-        {workoutMode === 'prep' && (
-          <div>
-            <h2>PRÉPARATION</h2>
-            <img src={ex.gif} alt="exercice" style={{width: '300px', borderRadius: '20px'}}/>
-            <button style={styles.btn} onClick={() => setWorkoutMode('active')}>JE SUIS PRÊT</button>
-          </div>
-        )}
-        {workoutMode === 'active' && (
-          <div>
-            <h1>{ex.name}</h1>
-            <h2>Objectif : {ex.target} {ex.type === 'reps' ? 'Reps' : 'Sec'}</h2>
-            <button style={{...styles.btn, background: '#22c55e'}} onClick={nextExercise}>J'AI TERMINÉ</button>
-          </div>
-        )}
-        {workoutMode === 'rest' && <h1>REPOS : 30s</h1>}
-      </div>
-    );
-  }
-
-  return null;
-}
-import React, { useState, useEffect } from 'react';
-
-// --- BASE DE DONNÉES MASSIVE DES EXERCICES ---
-const EXERCISES_LIBRARY = [
-  { name: "Pompes", type: "reps", target: 10, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Squats", type: "reps", target: 15, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-  { name: "Gainage", type: "time", target: 45, gif: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZjhx&cid=c5f7d1b3" },
-];
-
-// --- NOUVEAU : BASE DE DONNÉES NUTRITIONNELLE ---
-const NUTRITION_LIBRARY = [
-  { breakfast: "Oatmeal & Fruits", lunch: "Poulet grillé et riz", dinner: "Saumon et brocolis" },
-  { breakfast: "Omelette 3 œufs", lunch: "Dinde et patate douce", dinner: "Salade de thon" },
-  { breakfast: "Yaourt grec & amandes", lunch: "Bœuf maigre et quinoa", dinner: "Soupe de légumes" },
-  { breakfast: "Smoothie protéiné", lunch: "Poisson blanc et asperges", dinner: "Poulet et avocat" },
-  { breakfast: "Avocado Toast", lunch: "Crevettes et riz complet", dinner: "Steak haché 5% et salade" },
-];
-
-export default function App() {
-  const [step, setStep] = useState(() => localStorage.getItem('app_step') || 'login');
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user_data')) || { email: '', age: '', weight: '', height: '' });
-  const [day, setDay] = useState(() => Number(localStorage.getItem('current_day')) || 1);
-  const [isPaid, setIsPaid] = useState(() => localStorage.getItem('is_paid') === 'true');
-  const [workoutMode, setWorkoutMode] = useState('prep');
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  // --- LOGIQUE NUTRITION ---
-  // Utilise le reste de la division par 5 pour avoir un cycle de 5 menus
-  const getNutritionForDay = () => NUTRITION_LIBRARY[(day - 1) % NUTRITION_LIBRARY.length];
-
-  useEffect(() => {
-    localStorage.setItem('app_step', step);
-    localStorage.setItem('user_data', JSON.stringify(user));
-    localStorage.setItem('current_day', day);
-    localStorage.setItem('is_paid', isPaid);
-  }, [step, user, day, isPaid]);
-
-  const styles = {
-    screen: {
-      width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', 
-      alignItems: 'center', justifyContent: 'center', color: '#fff', textAlign: 'center',
-      background: 'linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url("https://images.unsplash.com/photo-1534438327276-14e5300c3a48")',
-      backgroundSize: 'cover', position: 'fixed', top: 0, left: 0, overflowY: 'auto'
-    },
-    btn: { padding: '15px 40px', background: '#3b82f6', border: 'none', borderRadius: '50px', color: '#fff', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }
-  };
-
-  // --- ÉCRAN DASHBOARD ---
-  if (step === 'dashboard') {
-    const meal = getNutritionForDay();
-    return (
-      <div style={styles.screen}>
-        <h1>JOUR {day}</h1>
-        <div style={{margin: '20px', background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '15px'}}>
-          <h3>Menu du jour</h3>
-          <p>Petit-déjeuner : {meal.breakfast}</p>
-          <p>Déjeuner : {meal.lunch}</p>
-          <p>Dîner : {meal.dinner}</p>
-        </div>
-        
-        {day > 7 && !isPaid ? (
-          <button style={styles.btn} onClick={() => window.open('https://paypal.me/JubaBelkacemi', '_blank')}>PAYER 4,99 €</button>
-        ) : (
-          <button style={styles.btn} onClick={() => setStep('workout')}>LANCER LA SÉANCE</button>
-        )}
-      </div>
-    );
-  }
-
-  // ... (Garder le reste du code précédent pour login, profile, workout)
-  
-  // Note : Assure-toi de garder les autres parties du code (login, profile, workout) 
-  // comme dans le script précédent.
-  return <div style={styles.screen}><h1>Application en cours...</h1></div>;
-}
-import React, { useState } from 'react';
-
-function App() {
-  const [purchased, setPurchased] = useState(false);
-
-  const handleBuy = () => {
-    // Simule l'achat pour l'instant (on ajoutera le vrai système Stripe ou PayPal juste après !)
-    setPurchased(true);
-  };
-
-  return (
-    <div className="container">
-      <header className="header">
-        <h1>Défi 60 Jours</h1>
-        <p className="subtitle">Transforme tes habitudes et atteins tes objectifs</p>
-      </header>
-
-      <main className="main-content">
-        <section className="hero-card">
-          <h2>Le Programme Complet</h2>
-          <p className="price">4,99 € <span className="one-time">accès à vie</span></p>
-          
-          <ul className="features">
-            <li>📅 Plan d'action quotidien sur 60 jours</li>
-            <li>📱 Suivi simple et interactif sur mobile & PC</li>
-            <li>🔒 Accès sécurisé instantané</li>
-          </ul>
-
-          {!purchased ? (
-            <button onClick={handleBuy} className="buy-button">
-              Commencer le défi maintenant
-            </button>
-          ) : (
-            <div className="success-message">
-              <h3>🎉 Félicitations !</h3>
-              <p>Ton paiement (simulé) a réussi. Prêt à commencer le Jour 1 ?</p>
-            </div>
-          )}
-        </section>
-
-        <section className="details">
-          <h3>Pourquoi ce défi ?</h3>
-          <p>Ce programme a été conçu pour t'accompagner pas à pas, chaque jour, avec des actions concrètes et rapides à réaliser pour voir un vrai changement en 60 jours.</p>
-        </section>
-      </main>
-
-      <footer className="footer">
-        <p>© 2026 Défi 60 Jours. Tous droits réservés.</p>
-      </footer>
-    </div>
-  );
-}
-
-export default App;
-import React from 'react';
-
-function App() {
-  // Ton lien PayPal.Me configuré pour 4.99 €
-  const paypalLink = "https://paypal.me/JubaBelkacemi/4.99";
-
-  return (
-    <div className="container">
-      <header className="header">
-        <h1>Défi 60 Jours</h1>
-        <p className="subtitle">Transforme tes habitudes et atteins tes objectifs</p>
-      </header>
-
-      <main className="main-content">
-        <section className="hero-card">
-          <h2>Le Programme Complet</h2>
-          <p className="price">4,99 € <span className="one-time">accès à vie</span></p>
-          
-          <ul className="features">
-            <li>📅 Plan d'action quotidien sur 60 jours</li>
-            <li>📱 Suivi simple et interactif sur mobile & PC</li>
-            <li>🔒 Accès sécurisé instantané</li>
-          </ul>
-
-          <div className="payment-area">
-            {/* Bouton Unique PayPal / CB */}
-            <a href={paypalLink} target="_blank" rel="noopener noreferrer" className="paypal-btn">
-              💛 Commencer le Défi (PayPal ou CB)
-            </a>
-            <p className="cards-accepted">💳 Cartes Bancaires acceptées via PayPal</p>
-          </div>
-
-          <p className="payment-note">Après votre paiement, vous recevrez votre accès au défi par e-mail sous quelques minutes.</p>
-        </section>
-
-        <section className="details">
-          <h3>Pourquoi ce défi ?</h3>
-          <p>Ce programme a été conçu pour t'accompagner pas à pas, chaque jour, avec des actions concrètes et rapides à réaliser pour voir un vrai changement en 60 jours.</p>
-        </section>
-      </main>
-
-      <footer className="footer">
-        <p>© 2026 Défi 60 Jours. Tous droits réservés.</p>
-      </footer>
-    </div>
-  );
-}
-
-export default App;
-import React, { useState, useEffect } from 'react';
-
 function App() {
   // 1. CORRECTION DECONNEXION : Détection et routage automatique si déjà connecté
   const [email, setEmail] = useState(() => localStorage.getItem('defi_fullscreen_email') || '');
@@ -810,3 +514,53 @@ function App() {
 }
 
 export default App;
+import React from 'react';
+
+function App() {
+  // Ton lien PayPal.Me configuré pour 4.99 €
+  const paypalLink = "https://paypal.me/JubaBelkacemi/4.99";
+
+  return (
+    <div className="container">
+      <header className="header">
+        <h1>Défi 60 Jours</h1>
+        <p className="subtitle">Transforme tes habitudes et atteins tes objectifs</p>
+      </header>
+
+      <main className="main-content">
+        <section className="hero-card">
+          <h2>Le Programme Complet</h2>
+          <p className="price">4,99 € <span className="one-time">accès à vie</span></p>
+          
+          <ul className="features">
+            <li>📅 Plan d'action quotidien sur 60 jours</li>
+            <li>📱 Suivi simple et interactif sur mobile & PC</li>
+            <li>🔒 Accès sécurisé instantané</li>
+          </ul>
+
+          <div className="payment-area">
+            {/* Bouton Unique PayPal / CB */}
+            <a href={paypalLink} target="_blank" rel="noopener noreferrer" className="paypal-btn">
+              💛 Commencer le Défi (PayPal ou CB)
+            </a>
+            <p className="cards-accepted">💳 Cartes Bancaires acceptées via PayPal</p>
+          </div>
+
+          <p className="payment-note">Après votre paiement, vous recevrez votre accès au défi par e-mail sous quelques minutes.</p>
+        </section>
+
+        <section className="details">
+          <h3>Pourquoi ce défi ?</h3>
+          <p>Ce programme a été conçu pour t'accompagner pas à pas, chaque jour, avec des actions concrètes et rapides à réaliser pour voir un vrai changement en 60 jours.</p>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <p>© 2026 Défi 60 Jours. Tous droits réservés.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
+

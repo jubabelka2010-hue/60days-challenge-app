@@ -3,10 +3,6 @@ import React, { useState, useEffect } from 'react';
 function App() {
   // 1. CORRECTION DECONNEXION : Détection et routage automatique si déjà connecté
   const [email, setEmail] = useState(() => localStorage.getItem('defi_fullscreen_email') || '');
-  // NOUVEAU : État pour vérifier si le profil est complété
-  const [isProfileComplete, setIsProfileComplete] = useState(() => localStorage.getItem('user_profile_data') !== null);
-  const [userStats, setUserStats] = useState({ age: '', weight: '', height: '', goal: 'fat_loss' });
-  
   const [currentPath, setCurrentPath] = useState(() => {
     const savedEmail = localStorage.getItem('defi_fullscreen_email');
     return savedEmail ? '/private-arena' : '/';
@@ -105,10 +101,8 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('defi_fullscreen_email');
-    localStorage.removeItem('user_profile_data');
     setEmail('');
     setInputEmail('');
-    setIsProfileComplete(false);
     setWorkoutMode('dashboard');
     navigateTo('/');
   };
@@ -193,79 +187,154 @@ function App() {
     styleSheet.innerText = `
       html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; background-color: #050811; font-family: 'Poppins', sans-serif; user-select: none; }
       .canvas-3d { perspective: 1000px; width: 100%; height: 260px; display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden; background: radial-gradient(circle, rgba(30,41,59,0.2) 0%, rgba(5,8,17,0) 70%); border-radius: 20px; }
+      
+      /* Structure du Corps Humain Réaliste */
       .human-body { position: relative; width: 120px; height: 200px; transform-style: preserve-3d; transform: rotateX(-10deg) rotateY(30deg); transition: transform 0.5s ease; }
       .h-head { position: absolute; width: 26px; height: 32px; background: #e0a980; border-radius: 40% 40% 50% 50%; top: 0; left: 47px; box-shadow: inset -3px -3px 5px rgba(0,0,0,0.2); }
       .h-torso { position: absolute; width: 44px; height: 65px; background: #2563eb; border-radius: 10px 10px 4px 4px; top: 34px; left: 38px; box-shadow: inset -5px -5px 10px rgba(0,0,0,0.4); }
       .h-pelvis { position: absolute; width: 40px; height: 20px; background: #1e3a8a; border-radius: 2px 2px 8px 8px; top: 100px; left: 40px; }
+      
+      /* Membres Articulés Complexes */
       .h-arm { position: absolute; width: 14px; height: 35px; background: #e0a980; border-radius: 7px; transform-origin: top center; }
       .h-forearm { position: absolute; width: 12px; height: 35px; background: #e0a980; border-radius: 6px; bottom: -30px; left: 1px; transform-origin: top center; }
+      
       .h-thigh { position: absolute; width: 16px; height: 45px; background: #1e4ed8; border-radius: 8px; transform-origin: top center; }
       .h-shin { position: absolute; width: 13px; height: 45px; background: #e0a980; border-radius: 6px; bottom: -40px; left: 1px; transform-origin: top center; }
+
+      /* Positions initiales des membres */
       .left-arm { top: 36px; left: 22px; }
       .right-arm { top: 36px; left: 84px; }
       .left-leg { top: 118px; left: 42px; }
       .right-leg { top: 118px; left: 62px; }
-      @keyframes realSquatTorso { 0%, 100% { transform: translateY(0) rotateX(-10deg) rotateY(45deg); } 50% { transform: translateY(40px) rotateX(-25deg) rotateY(45deg); } }
-      @keyframes realSquatThigh { 0%, 100% { transform: rotateX(0deg); } 50% { transform: rotateX(-75deg); } }
-      @keyframes realSquatShin { 0%, 100% { transform: rotateX(0deg); } 50% { transform: rotateX(80deg); } }
-      @keyframes realSquatArm { 0%, 100% { transform: rotateX(0deg); } 50% { transform: rotateX(-60deg); } }
+
+      /* ================= ANIMATION SQUAT REEL ================= */
+      @keyframes realSquatTorso {
+        0%, 100% { transform: translateY(0) rotateX(-10deg) rotateY(45deg); }
+        50% { transform: translateY(40px) rotateX(-25deg) rotateY(45deg); }
+      }
+      @keyframes realSquatThigh {
+        0%, 100% { transform: rotateX(0deg); }
+        50% { transform: rotateX(-75deg); }
+      }
+      @keyframes realSquatShin {
+        0%, 100% { transform: rotateX(0deg); }
+        50% { transform: rotateX(80deg); }
+      }
+      @keyframes realSquatArm {
+        0%, 100% { transform: rotateX(0deg); }
+        50% { transform: rotateX(-60deg); }
+      }
       .anim-squat-torso { animation: realSquatTorso 2.5s infinite ease-in-out; }
       .anim-squat-thigh { animation: realSquatThigh 2.5s infinite ease-in-out; }
       .anim-squat-shin { animation: realSquatShin 2.5s infinite ease-in-out; }
       .anim-squat-arm { animation: realSquatArm 2.5s infinite ease-in-out; }
-      @keyframes realPushupBody { 0%, 100% { transform: translateY(40px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); } 50% { transform: translateY(75px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); } }
-      @keyframes realPushupArm { 0%, 100% { transform: rotateX(-20deg); } 50% { transform: rotateX(-85deg); } }
-      @keyframes realPushupForearm { 0%, 100% { transform: rotateX(15deg); } 50% { transform: rotateX(85deg); } }
+
+      /* ================= ANIMATION POMPE REELLE ================= */
+      @keyframes realPushupBody {
+        0%, 100% { transform: translateY(40px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); }
+        50% { transform: translateY(75px) rotateX(75deg) rotateY(0deg) rotateZ(10deg); }
+      }
+      @keyframes realPushupArm {
+        0%, 100% { transform: rotateX(-20deg); }
+        50% { transform: rotateX(-85deg); }
+      }
+      @keyframes realPushupForearm {
+        0%, 100% { transform: rotateX(15deg); }
+        50% { transform: rotateX(85deg); }
+      }
       .anim-pushup-body { animation: realPushupBody 2s infinite ease-in-out; }
       .anim-pushup-arm { animation: realPushupArm 2s infinite ease-in-out; }
       .anim-pushup-forearm { animation: realPushupForearm 2s infinite ease-in-out; }
-      @keyframes climberLegL { 0%, 100% { transform: rotateX(-40deg); } 50% { transform: rotateX(-10deg); } }
-      @keyframes climberLegR { 0%, 100% { transform: rotateX(-10deg); } 50% { transform: rotateX(-40deg); } }
+
+      /* ================= ANIMATION MOUNTAIN CLIMBER ================= */
+      @keyframes climberLegL {
+        0%, 100% { transform: rotateX(-40deg); }
+        50% { transform: rotateX(-10deg); }
+      }
+      @keyframes climberLegR {
+        0%, 100% { transform: rotateX(-10deg); }
+        50% { transform: rotateX(-40deg); }
+      }
       .anim-climber-body { transform: translateY(50px) rotateX(65deg) rotateY(0deg) rotateZ(15deg); }
       .anim-climber-thigh-L { animation: climberLegL 0.6s infinite linear; }
       .anim-climber-thigh-R { animation: climberLegR 0.6s infinite linear; }
+
+      /* Interface Utilisateur */
       .glass-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 22px; margin-bottom: 15px; }
     `;
     document.head.appendChild(styleSheet);
     return () => document.head.removeChild(styleSheet);
   }, []);
 
+  // COMPOSANT HUMANOIDE ANATOMIQUE DE HAUTE QUALITÉ
   const RenderAnatomicalHuman = ({ type }) => {
     if (type === 'pushup' || type === 'plank') {
       const isPlank = type === 'plank';
       return (
         <div className="canvas-3d">
           <div className={`human-body ${isPlank ? '' : 'anim-pushup-body'}`} style={isPlank ? { transform: 'translateY(65px) rotateX(78deg) rotateY(0deg) rotateZ(15deg)' } : {}}>
-            <div className="h-head"></div><div className="h-torso"></div><div className="h-pelvis" style={{ top: '98px' }}></div>
-            <div className={`h-arm left-arm ${isPlank ? '' : 'anim-pushup-arm'}`} style={isPlank ? { transform: 'rotateX(-70deg)' } : {}}><div className={`h-forearm ${isPlank ? '' : 'anim-pushup-forearm'}`} style={isPlank ? { transform: 'rotateX(70deg)' } : {}}></div></div>
-            <div className={`h-arm right-arm ${isPlank ? '' : 'anim-pushup-arm'}`} style={isPlank ? { transform: 'rotateX(-70deg)' } : {}}><div className={`h-forearm ${isPlank ? '' : 'anim-pushup-forearm'}`} style={isPlank ? { transform: 'rotateX(70deg)' } : {}}></div></div>
-            <div className="h-thigh left-leg" style={{ transform: 'rotateX(-10deg)' }}><div className="h-shin" style={{ transform: 'rotateX(5deg)' }}></div></div>
-            <div className="h-thigh right-leg" style={{ transform: 'rotateX(-10deg)' }}><div className="h-shin" style={{ transform: 'rotateX(5deg)' }}></div></div>
+            <div className="h-head"></div>
+            <div className="h-torso"></div>
+            <div className="h-pelvis" style={{ top: '98px' }}></div>
+            {/* Bras gauche articulé */}
+            <div className={`h-arm left-arm ${isPlank ? '' : 'anim-pushup-arm'}`} style={isPlank ? { transform: 'rotateX(-70deg)' } : {}}>
+              <div className={`h-forearm ${isPlank ? '' : 'anim-pushup-forearm'}`} style={isPlank ? { transform: 'rotateX(70deg)' } : {}}></div>
+            </div>
+            {/* Bras droit articulé */}
+            <div className={`h-arm right-arm ${isPlank ? '' : 'anim-pushup-arm'}`} style={isPlank ? { transform: 'rotateX(-70deg)' } : {}}>
+              <div className={`h-forearm ${isPlank ? '' : 'anim-pushup-forearm'}`} style={isPlank ? { transform: 'rotateX(70deg)' } : {}}></div>
+            </div>
+            {/* Jambes tendues alignées */}
+            <div className="h-thigh left-leg" style={{ transform: 'rotateX(-10deg)' }}>
+              <div className="h-shin" style={{ transform: 'rotateX(5deg)' }}></div>
+            </div>
+            <div className="h-thigh right-leg" style={{ transform: 'rotateX(-10deg)' }}>
+              <div className="h-shin" style={{ transform: 'rotateX(5deg)' }}></div>
+            </div>
           </div>
         </div>
       );
     }
+
     if (type === 'squat') {
       return (
         <div className="canvas-3d">
           <div className="human-body anim-squat-torso" style={{ top: '-15px' }}>
-            <div className="h-head"></div><div className="h-torso"></div><div className="h-pelvis"></div>
+            <div className="h-head"></div>
+            <div className="h-torso"></div>
+            <div className="h-pelvis"></div>
+            {/* Bras tendus devant pendant le squat */}
             <div className="h-arm left-arm anim-squat-arm"><div className="h-forearm" style={{ transform: 'rotateX(-10deg)' }}></div></div>
             <div className="h-arm right-arm anim-squat-arm"><div className="h-forearm" style={{ transform: 'rotateX(-10deg)' }}></div></div>
-            <div className="h-thigh left-leg anim-squat-thigh"><div className="h-shin anim-squat-shin"></div></div>
-            <div className="h-thigh right-leg anim-squat-thigh"><div className="h-shin anim-squat-shin"></div></div>
+            {/* Jambes qui se plient complètement */}
+            <div className="h-thigh left-leg anim-squat-thigh">
+              <div className="h-shin anim-squat-shin"></div>
+            </div>
+            <div className="h-thigh right-leg anim-squat-thigh">
+              <div className="h-shin anim-squat-shin"></div>
+            </div>
           </div>
         </div>
       );
     }
+
+    // Default: Mountain Climbers
     return (
       <div className="canvas-3d">
         <div className="human-body anim-climber-body">
-          <div className="h-head"></div><div className="h-torso"></div><div className="h-pelvis" style={{ top: '98px' }}></div>
+          <div className="h-head"></div>
+          <div className="h-torso"></div>
+          <div className="h-pelvis" style={{ top: '98px' }}></div>
+          {/* Appui fixe sur les bras */}
           <div className="h-arm left-arm" style={{ transform: 'rotateX(-50deg)' }}><div className="h-forearm" style={{ transform: 'rotateX(40deg)' }}></div></div>
           <div className="h-arm right-arm" style={{ transform: 'rotateX(-50deg)' }}><div className="h-forearm" style={{ transform: 'rotateX(40deg)' }}></div></div>
-          <div className="h-thigh left-leg anim-climber-thigh-L"><div className="h-shin" style={{ transform: 'rotateX(40deg)' }}></div></div>
-          <div className="h-thigh right-leg anim-climber-thigh-R"><div className="h-shin" style={{ transform: 'rotateX(40deg)' }}></div></div>
+          {/* Genoux qui courent vers le torso */}
+          <div className="h-thigh left-leg anim-climber-thigh-L">
+            <div className="h-shin" style={{ transform: 'rotateX(40deg)' }}></div>
+          </div>
+          <div className="h-thigh right-leg anim-climber-thigh-R">
+            <div className="h-shin" style={{ transform: 'rotateX(40deg)' }}></div>
+          </div>
         </div>
       </div>
     );
@@ -283,27 +352,6 @@ function App() {
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <input type="email" placeholder="Entrez votre e-mail..." required value={inputEmail} onChange={(e) => setInputEmail(e.target.value)} style={{ padding: '20px 30px', borderRadius: '50px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1.1rem', textAlign: 'center', outline: 'none' }} />
             <button type="submit" style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '20px', borderRadius: '50px', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer', textTransform: 'uppercase' }}>Se connecter</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // --- NOUVEAU : ÉCRAN PROFILAGE ---
-  if (email && !isProfileComplete) {
-    return (
-      <div style={screenWrapperStyle}>
-        <div style={{ maxWidth: '400px', width: '100%' }}>
-          <h2 style={{ fontSize: '2rem', marginBottom: '20px' }}>Finalisez votre profil</h2>
-          <form onSubmit={(e) => { e.preventDefault(); localStorage.setItem('user_profile_data', JSON.stringify(userStats)); setIsProfileComplete(true); }} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <input type="number" placeholder="Âge" required onChange={(e) => setUserStats({...userStats, age: e.target.value})} style={{ padding: '15px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-            <input type="number" placeholder="Poids (kg)" required onChange={(e) => setUserStats({...userStats, weight: e.target.value})} style={{ padding: '15px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-            <input type="number" placeholder="Taille (cm)" required onChange={(e) => setUserStats({...userStats, height: e.target.value})} style={{ padding: '15px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-            <select onChange={(e) => setUserStats({...userStats, goal: e.target.value})} style={{ padding: '15px', borderRadius: '20px', background: 'rgba(255,255,255,0.1)', color: 'white' }}>
-              <option value="fat_loss">Objectif: Perte de gras</option>
-              <option value="muscle_gain">Objectif: Prise de masse</option>
-            </select>
-            <button type="submit" style={{ padding: '15px', borderRadius: '50px', background: '#10b981', color: 'white', border: 'none', fontWeight: 'bold' }}>Valider</button>
           </form>
         </div>
       </div>
@@ -345,6 +393,7 @@ function App() {
       return (
         <div style={screenWrapperStyle}>
           <div style={{ maxWidth: '600px', width: '100%', paddingBottom: '40px' }}>
+            {/* CORRECTION NAVIGATION : Retour propre au Dashboard */}
             <button onClick={() => setWorkoutMode('dashboard')} style={{ background: 'rgba(255,255,255,0.12)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '50px', marginBottom: '30px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: '0.2s' }}>
               ← Retour au Dashboard
             </button>
@@ -377,6 +426,7 @@ function App() {
       return (
         <div style={screenWrapperStyle}>
           <div style={{ maxWidth: '650px', width: '100%' }}>
+            {/* Bouton pour abandonner la séance en cours et revenir sain et sauf au dashboard */}
             <button onClick={() => setWorkoutMode('dashboard')} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#94a3b8', padding: '8px 20px', borderRadius: '50px', cursor: 'pointer', marginBottom: '15px', fontWeight: 'bold' }}>✕ Annuler la séance</button>
             <br/>
             <span style={{ fontSize: '1rem', color: '#ff9f43', fontWeight: 'bold', letterSpacing: '3px' }}>PRÉPARATION</span>
@@ -398,7 +448,7 @@ function App() {
       );
     }
 
-    // --- ÉCRAN 5 : EFFORT ---
+    // --- ÉCRAN 5 : EFFORT (Articulations humaines actives) ---
     if (workoutMode === 'effort') {
       return (
         <div style={screenWrapperStyle}>

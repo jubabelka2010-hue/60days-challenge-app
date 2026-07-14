@@ -167,9 +167,7 @@ function App() {
 
   const program = getDayProgram(currentDay, profile);
   const currentEx = program[currentExerciseIndex] || program[0];
-  const program = getDayProgram(currentDay, profile);
-  const currentEx = program[currentExerciseIndex] || program[0];
-
+  
   // Chronomètres d'Effort (Temps vs Répétitions)
   useEffect(() => {
     let timer = null;

@@ -191,163 +191,110 @@ export default function App() {
   // comme dans le script précédent.
   return <div style={styles.screen}><h1>Application en cours...</h1></div>;
 }
-const PAYPAL_LINK =
-"https://paypal.me/TONCOMPTE";
+import React, { useState } from 'react';
 
+function App() {
+  const [purchased, setPurchased] = useState(false);
 
-const activateSubscription = () => {
-
-  window.location.href = PAYPAL_LINK;
-
-};// ================= ECRAN PROFIL PREMIERE UTILISATION =================
-
-if(email && !userProfile){
-
-return (
-
-<div style={screenWrapperStyle}>
-
-<div style={{maxWidth:"500px",width:"100%"}}>
-
-<h1 style={{
-fontSize:"3rem",
-fontWeight:"900"
-}}>
-Ton Profil
-</h1>
-
-
-<p style={{
-color:"#94a3b8"
-}}>
-Ces informations permettent d'adapter ton programme.
-</p>
-
-
-<input
-placeholder="Âge"
-type="number"
-value={age}
-onChange={(e)=>setAge(e.target.value)}
-style={inputStyle}
-/>
-
-
-<input
-placeholder="Poids (kg)"
-type="number"
-value={weight}
-onChange={(e)=>setWeight(e.target.value)}
-style={inputStyle}
-/>
-
-
-<input
-placeholder="Taille (cm)"
-type="number"
-value={height}
-onChange={(e)=>setHeight(e.target.value)}
-style={inputStyle}
-/>
-
-
-
-<button
-onClick={saveProfile}
-style={{
-background:"#3b82f6",
-color:"white",
-border:"none",
-padding:"20px",
-borderRadius:"50px",
-width:"100%",
-fontWeight:"900",
-marginTop:"20px"
-}}
->
-Créer mon programme
-</button>
-
-
-</div>
-
-</div>
-
-);
-
-}// ================= CALCUL IMC =================
-
-const calculateIMC = () => {
-
-  const tailleMetre = Number(height) / 100;
-  const poids = Number(weight);
-
-  if (!tailleMetre || !poids) return;
-
-  const result = (poids / (tailleMetre * tailleMetre)).toFixed(1);
-
-  setImc(result);
-
-  return result;
-};
-
-
-// ================= CREATION PROFIL =================
-
-const saveProfile = () => {
-
-  const calculatedIMC = calculateIMC();
-
-  const profile = {
-    age: Number(age),
-    weight: Number(weight),
-    height: Number(height),
-    imc: Number(calculatedIMC)
+  const handleBuy = () => {
+    // Simule l'achat pour l'instant (on ajoutera le vrai système Stripe ou PayPal juste après !)
+    setPurchased(true);
   };
 
+  return (
+    <div className="container">
+      <header className="header">
+        <h1>Défi 60 Jours</h1>
+        <p className="subtitle">Transforme tes habitudes et atteins tes objectifs</p>
+      </header>
 
-  localStorage.setItem(
-    'defi_profile',
-    JSON.stringify(profile)
+      <main className="main-content">
+        <section className="hero-card">
+          <h2>Le Programme Complet</h2>
+          <p className="price">4,99 € <span className="one-time">accès à vie</span></p>
+          
+          <ul className="features">
+            <li>📅 Plan d'action quotidien sur 60 jours</li>
+            <li>📱 Suivi simple et interactif sur mobile & PC</li>
+            <li>🔒 Accès sécurisé instantané</li>
+          </ul>
+
+          {!purchased ? (
+            <button onClick={handleBuy} className="buy-button">
+              Commencer le défi maintenant
+            </button>
+          ) : (
+            <div className="success-message">
+              <h3>🎉 Félicitations !</h3>
+              <p>Ton paiement (simulé) a réussi. Prêt à commencer le Jour 1 ?</p>
+            </div>
+          )}
+        </section>
+
+        <section className="details">
+          <h3>Pourquoi ce défi ?</h3>
+          <p>Ce programme a été conçu pour t'accompagner pas à pas, chaque jour, avec des actions concrètes et rapides à réaliser pour voir un vrai changement en 60 jours.</p>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <p>© 2026 Défi 60 Jours. Tous droits réservés.</p>
+      </footer>
+    </div>
   );
+}
 
+export default App;
+import React from 'react';
 
-  setUserProfile(profile);
+function App() {
+  // Ton lien PayPal.Me configuré pour 4.99 €
+  const paypalLink = "https://paypal.me/JubaBelkacemi/4.99";
 
+  return (
+    <div className="container">
+      <header className="header">
+        <h1>Défi 60 Jours</h1>
+        <p className="subtitle">Transforme tes habitudes et atteins tes objectifs</p>
+      </header>
 
-  if(!trialStartDate){
+      <main className="main-content">
+        <section className="hero-card">
+          <h2>Le Programme Complet</h2>
+          <p className="price">4,99 € <span className="one-time">accès à vie</span></p>
+          
+          <ul className="features">
+            <li>📅 Plan d'action quotidien sur 60 jours</li>
+            <li>📱 Suivi simple et interactif sur mobile & PC</li>
+            <li>🔒 Accès sécurisé instantané</li>
+          </ul>
 
-    const today = new Date();
+          <div className="payment-area">
+            {/* Bouton Unique PayPal / CB */}
+            <a href={paypalLink} target="_blank" rel="noopener noreferrer" className="paypal-btn">
+              💛 Commencer le Défi (PayPal ou CB)
+            </a>
+            <p className="cards-accepted">💳 Cartes Bancaires acceptées via PayPal</p>
+          </div>
 
-    localStorage.setItem(
-      'defi_trial_start',
-      today.toISOString()
-    );
+          <p className="payment-note">Après votre paiement, vous recevrez votre accès au défi par e-mail sous quelques minutes.</p>
+        </section>
 
-    setTrialStartDate(today);
-  }
+        <section className="details">
+          <h3>Pourquoi ce défi ?</h3>
+          <p>Ce programme a été conçu pour t'accompagner pas à pas, chaque jour, avec des actions concrètes et rapides à réaliser pour voir un vrai changement en 60 jours.</p>
+        </section>
+      </main>
 
-};// ================= PROFIL UTILISATEUR =================
+      <footer className="footer">
+        <p>© 2026 Défi 60 Jours. Tous droits réservés.</p>
+      </footer>
+    </div>
+  );
+}
 
-const [userProfile, setUserProfile] = useState(() => {
-  const saved = localStorage.getItem('defi_profile');
-  return saved ? JSON.parse(saved) : null;
-});
-
-const [age, setAge] = useState('');
-const [weight, setWeight] = useState('');
-const [height, setHeight] = useState('');
-
-const [imc, setImc] = useState(null);
-
-const [subscriptionActive, setSubscriptionActive] = useState(() => {
-  return localStorage.getItem('defi_subscription') === 'active';
-});
-
-const [trialStartDate, setTrialStartDate] = useState(() => {
-  const saved = localStorage.getItem('defi_trial_start');
-  return saved ? new Date(saved) : null;
-});import React, { useState, useEffect } from 'react';
+export default App;
+import React, { useState, useEffect } from 'react';
 
 function App() {
   // 1. CORRECTION DECONNEXION : Détection et routage automatique si déjà connecté

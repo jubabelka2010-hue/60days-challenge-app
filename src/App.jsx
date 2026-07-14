@@ -1,12 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 function App() {
-  const [purchased, setPurchased] = useState(false);
-
-  const handleBuy = () => {
-    // Simule l'achat pour l'instant (on ajoutera le vrai système Stripe ou PayPal juste après !)
-    setPurchased(true);
-  };
+  // Ton lien PayPal.Me configuré pour 4.99 €
+  const paypalLink = "https://paypal.me/JubaBelkacemi/4.99";
 
   return (
     <div className="container">
@@ -26,16 +22,15 @@ function App() {
             <li>🔒 Accès sécurisé instantané</li>
           </ul>
 
-          {!purchased ? (
-            <button onClick={handleBuy} className="buy-button">
-              Commencer le défi maintenant
-            </button>
-          ) : (
-            <div className="success-message">
-              <h3>🎉 Félicitations !</h3>
-              <p>Ton paiement (simulé) a réussi. Prêt à commencer le Jour 1 ?</p>
-            </div>
-          )}
+          <div className="payment-area">
+            {/* Bouton Unique PayPal / CB */}
+            <a href={paypalLink} target="_blank" rel="noopener noreferrer" className="paypal-btn">
+              💛 Commencer le Défi (PayPal ou CB)
+            </a>
+            <p className="cards-accepted">💳 Cartes Bancaires acceptées via PayPal</p>
+          </div>
+
+          <p className="payment-note">Après votre paiement, vous recevrez votre accès au défi par e-mail sous quelques minutes.</p>
         </section>
 
         <section className="details">

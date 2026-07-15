@@ -31,7 +31,40 @@ function App() {
   // ===================== NOUVEAU : PAIEMENT / DEBLOCAGE =====================
   const [isUnlocked, setIsUnlocked] = useState(false);
   const PAYWALL_DAY = 7;
-  const PAYPAL_LINK = 'https://paypal.me/JubaBelkacemi';
+  const PAYPAL_LINK = 'https://paypal.me/JubaBelkacemi/4.99';
+
+  // ===================== NOUVEAU : VÉRIFICATION RÉELLE DU PAIEMENT (Supabase) =====================
+  const SUPABASE_URL = 'https://akvegzoywegpgaehpuow.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_8mh9poPkCS_ssmjcxbgS9Q_4CqBXnc7';
+  const [checkingPayment, setCheckingPayment] = useState(false);
+
+  const checkUnlockStatus = async () => {
+    if (!email) return;
+    setCheckingPayment(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/unlocks?email=eq.${encodeURIComponent(email)}&select=unlocked`, {
+        headers: {
+          'apikey': SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+        }
+      });
+      const rows = await res.json();
+      if (rows && rows[0] && rows[0].unlocked === true) {
+        setIsUnlocked(true);
+      }
+    } catch (e) {
+      console.log('Vérification impossible :', e.message);
+    }
+    setCheckingPayment(false);
+  };
+
+  // Vérifie automatiquement toutes les 5 secondes tant qu'on est sur l'écran de paiement
+  useEffect(() => {
+    if (workoutMode !== 'payment') return;
+    checkUnlockStatus();
+    const interval = setInterval(checkUnlockStatus, 5000);
+    return () => clearInterval(interval);
+  }, [workoutMode, email]);
 
   // ===================== NOUVEAU : BADGES =====================
   const BADGE_DAYS = [7, 15, 20, 30, 40, 60];
@@ -53,15 +86,29 @@ function App() {
   const [coins, setCoins] = useState(0);
   const [ownedCharacters, setOwnedCharacters] = useState(['c1']); // le premier personnage est offert
   const [equippedCharacter, setEquippedCharacter] = useState('c1');
+  // 20 personnages. Prix pensés pour qu'il faille environ 15 jours d'entraînement assidu
+  // (sans rien dépenser ailleurs) pour se payer le personnage le plus cher.
   const CHARACTERS = [
-    { id: 'c1', name: 'Débutant', cost: 10, icon: '🙂' },
-    { id: 'c2', name: 'Sportif', cost: 25, icon: '🏃' },
-    { id: 'c3', name: 'Ninja Agile', cost: 40, icon: '🥷' },
-    { id: 'c4', name: 'Chevalier', cost: 60, icon: '🛡️' },
-    { id: 'c5', name: 'Pirate', cost: 90, icon: '🏴‍☠️' },
-    { id: 'c6', name: 'Sorcier', cost: 130, icon: '🧙' },
-    { id: 'c7', name: 'Super-Héros', cost: 180, icon: '🦸' },
-    { id: 'c8', name: 'Champion Légendaire', cost: 230, icon: '👑' }
+    { id: 'c1', name: 'Recrue', cost: 10, color: '#94a3b8', emoji: '●' },
+    { id: 'c2', name: 'Coureur', cost: 25, color: '#38bdf8', emoji: '▲' },
+    { id: 'c3', name: 'Grimpeur', cost: 45, color: '#22d3ee', emoji: '◆' },
+    { id: 'c4', name: 'Combattant', cost: 70, color: '#34d399', emoji: '★' },
+    { id: 'c5', name: 'Athlète', cost: 100, color: '#facc15', emoji: '✦' },
+    { id: 'c6', name: 'Guerrier', cost: 135, color: '#fb923c', emoji: '⬟' },
+    { id: 'c7', name: 'Ninja', cost: 175, color: '#f87171', emoji: '✚' },
+    { id: 'c8', name: 'Gladiateur', cost: 215, color: '#e879f9', emoji: '❖' },
+    { id: 'c9', name: 'Chevalier', cost: 255, color: '#a78bfa', emoji: '♦' },
+    { id: 'c10', name: 'Archer', cost: 295, color: '#818cf8', emoji: '➤' },
+    { id: 'c11', name: 'Pirate', cost: 335, color: '#60a5fa', emoji: '☠' },
+    { id: 'c12', name: 'Samouraï', cost: 375, color: '#f472b6', emoji: '⚔' },
+    { id: 'c13', name: 'Sorcier', cost: 410, color: '#c084fc', emoji: '✧' },
+    { id: 'c14', name: 'Alchimiste', cost: 440, color: '#4ade80', emoji: '⚗' },
+    { id: 'c15', name: 'Titan', cost: 465, color: '#fbbf24', emoji: '⬢' },
+    { id: 'c16', name: 'Phénix', cost: 485, color: '#fb7185', emoji: '🜂' },
+    { id: 'c17', name: 'Dragon', cost: 500, color: '#22c55e', emoji: '☄' },
+    { id: 'c18', name: 'Spectre', cost: 515, color: '#6366f1', emoji: '☾' },
+    { id: 'c19', name: 'Empereur', cost: 530, color: '#eab308', emoji: '☀' },
+    { id: 'c20', name: 'Champion Légendaire', cost: 550, color: '#f43f5e', emoji: '♛' }
   ];
 
   // ===================== NOUVEAU : PARCOURS / SAISONS / JOUR ACTIF =====================
@@ -295,11 +342,8 @@ function App() {
     setWorkoutMode('dashboard');
   };
 
-  // ===================== NOUVEAU : DEBLOCAGE PAIEMENT =====================
-  const confirmPayment = () => {
-    setIsUnlocked(true);
-    setWorkoutMode('dashboard');
-  };
+  // (Le déblocage manuel "J'ai payé" a été retiré : le déblocage se fait maintenant uniquement
+  // via checkUnlockStatus, qui vérifie la vraie confirmation de paiement dans Supabase.)
 
   const startFullWorkout = () => {
     if (currentDay >= PAYWALL_DAY && !isUnlocked) {
@@ -793,13 +837,20 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
 
             {paymentClicked ? (
               <>
-                <button onClick={confirmPayment} style={{ background: 'transparent', border: '2px solid #10b981', color: '#10b981', width: '100%', padding: '16px', borderRadius: '50px', fontWeight: '900', fontSize: '1rem', cursor: 'pointer' }}>
-                  ✅ J'ai payé, débloquer mon accès
+                <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '18px', padding: '18px', marginBottom: '14px' }}>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#e2e8f0' }}>
+                    {checkingPayment ? '🔄 Vérification en cours...' : '⏳ En attente de la confirmation de PayPal...'}
+                  </p>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                    Cette page se met à jour automatiquement, tu n'as rien à faire une fois le paiement effectué.
+                  </p>
+                </div>
+                <button onClick={checkUnlockStatus} style={{ background: 'transparent', border: '2px solid #10b981', color: '#10b981', width: '100%', padding: '14px', borderRadius: '50px', fontWeight: '900', fontSize: '0.95rem', cursor: 'pointer' }}>
+                  🔄 Vérifier maintenant
                 </button>
-                <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '18px' }}>Reviens sur cette page une fois ton paiement PayPal terminé, puis confirme ici.</p>
               </>
             ) : (
-              <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '10px' }}>Le bouton de confirmation apparaîtra ici juste après ton paiement.</p>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '10px' }}>Une fois le paiement PayPal terminé, l'accès se débloque automatiquement ici, sans rien à cliquer.</p>
             )}
           </div>
         </div>
@@ -899,7 +950,15 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
                 const equipped = equippedCharacter === c.id;
                 return (
                   <div key={c.id} className="glass-card" style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '2.4rem', marginBottom: '8px' }}>{c.icon}</div>
+                    <div style={{
+                      width: '64px', height: '64px', borderRadius: '50%', margin: '0 auto 10px auto',
+                      background: `radial-gradient(circle at 30% 30%, ${c.color}, #050811)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '1.6rem', color: 'white', border: `2px solid ${c.color}`,
+                      boxShadow: owned ? `0 0 18px ${c.color}` : 'none'
+                    }}>
+                      {c.emoji}
+                    </div>
                     <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{c.name}</div>
                     <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '10px' }}>{owned ? 'Possédé' : `${c.cost} 🪙`}</div>
                     <button onClick={() => buyCharacter(c)} style={{ width: '100%', padding: '10px', borderRadius: '50px', border: 'none', cursor: 'pointer', fontWeight: '900', background: equipped ? '#10b981' : owned ? 'rgba(255,255,255,0.1)' : '#3b82f6', color: 'white' }}>
@@ -1069,4 +1128,3 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
 }
 
 export default App;
-

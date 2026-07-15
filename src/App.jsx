@@ -26,7 +26,7 @@ function App() {
 
   // ===================== NOUVEAU : PROFIL UTILISATEUR =====================
   const [profile, setProfile] = useState(null); // { weight, age, height, gender, goal }
-  const [profileForm, setProfileForm] = useState({ weight: '', age: '', height: '', gender: 'homme', goal: 'perte_poids' });
+  const [profileForm, setProfileForm] = useState({ weight: '', age: '', height: '', gender: 'homme', goal: 'perte_poids', displayName: '', avatar: '🙂' });
 
   // ===================== NOUVEAU : PAIEMENT / DEBLOCAGE =====================
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -48,6 +48,29 @@ function App() {
   // ===================== NOUVEAU : SUIVI DU CLIC SUR "PAYER" =====================
   // Le bouton "J'ai payé" ne doit apparaître qu'après que la personne ait cliqué sur "Payer"
   const [paymentClicked, setPaymentClicked] = useState(false);
+
+  // ===================== NOUVEAU : PIÈCES + PERSONNAGES (BOUTIQUE) =====================
+  const [coins, setCoins] = useState(0);
+  const [ownedCharacters, setOwnedCharacters] = useState(['c1']); // le premier personnage est offert
+  const [equippedCharacter, setEquippedCharacter] = useState('c1');
+  const CHARACTERS = [
+    { id: 'c1', name: 'Débutant', cost: 10, icon: '🙂' },
+    { id: 'c2', name: 'Sportif', cost: 25, icon: '🏃' },
+    { id: 'c3', name: 'Ninja Agile', cost: 40, icon: '🥷' },
+    { id: 'c4', name: 'Chevalier', cost: 60, icon: '🛡️' },
+    { id: 'c5', name: 'Pirate', cost: 90, icon: '🏴‍☠️' },
+    { id: 'c6', name: 'Sorcier', cost: 130, icon: '🧙' },
+    { id: 'c7', name: 'Super-Héros', cost: 180, icon: '🦸' },
+    { id: 'c8', name: 'Champion Légendaire', cost: 230, icon: '👑' }
+  ];
+
+  // ===================== NOUVEAU : PARCOURS / SAISONS / JOUR ACTIF =====================
+  const [viewSeason, setViewSeason] = useState(1); // 1 = jours 1-30, 2 = jours 31-60
+  const [activeDay, setActiveDay] = useState(1); // jour affiché pendant une séance/un menu (peut différer de currentDay si on "refait" un jour passé)
+  const [dayModal, setDayModal] = useState(null); // numéro du jour dont la popup est ouverte, ou null
+
+  // Avatars disponibles pour le profil (pas d'upload de photo possible sans serveur, donc choix d'un avatar emoji)
+  const AVATAR_OPTIONS = ['🙂', '😎', '💪', '🔥', '🐯', '🦁', '🧑‍🚀', '🥷'];
 
   // ===================== NOUVEAU : TÂCHE MENTALE DU JOUR =====================
   const MENTAL_TASKS = [
@@ -87,6 +110,17 @@ function App() {
 
       const savedPayClicked = localStorage.getItem(`${email}_fs_pay_clicked`);
       setPaymentClicked(savedPayClicked === 'true');
+
+      const savedCoins = localStorage.getItem(`${email}_fs_coins`);
+      setCoins(savedCoins ? Number(savedCoins) : 0);
+
+      const savedChars = localStorage.getItem(`${email}_fs_characters`);
+      setOwnedCharacters(savedChars ? JSON.parse(savedChars) : ['c1']);
+
+      const savedEquipped = localStorage.getItem(`${email}_fs_equipped`);
+      setEquippedCharacter(savedEquipped || 'c1');
+
+      setActiveDay(savedDay ? Number(savedDay) : 1);
     }
   }, [email]);
 
@@ -127,6 +161,15 @@ function App() {
     }
   }, [paymentClicked, email]);
 
+  // Sauvegarder les pièces et les personnages
+  useEffect(() => {
+    if (email) {
+      localStorage.setItem(`${email}_fs_coins`, coins);
+      localStorage.setItem(`${email}_fs_characters`, JSON.stringify(ownedCharacters));
+      localStorage.setItem(`${email}_fs_equipped`, equippedCharacter);
+    }
+  }, [coins, ownedCharacters, equippedCharacter, email]);
+
   // Attribution automatique des badges + verrouillage au jour du paywall
   useEffect(() => {
     if (!email) return;
@@ -151,6 +194,8 @@ function App() {
     return () => clearInterval(timer);
   }, [workoutMode, prepSeconds]);
 
+  // NOTE : ces deux fonctions doivent être définies AVANT l'appel à getDayProgram juste en dessous,
+  // sinon ça provoque une erreur "Cannot access before initialization" et un écran blanc.
   const calculateBMI = (p) => {
     if (!p || !p.height || !p.weight) return null;
     const heightM = p.height / 100;
@@ -165,9 +210,9 @@ function App() {
     return 'obesite';
   };
 
-  const program = getDayProgram(currentDay, profile);
+  const program = getDayProgram(activeDay, profile);
   const currentEx = program[currentExerciseIndex] || program[0];
-  
+
   // Chronomètres d'Effort (Temps vs Répétitions)
   useEffect(() => {
     let timer = null;
@@ -231,10 +276,23 @@ function App() {
     const a = Number(profileForm.age);
     const h = Number(profileForm.height);
     if (!w || !a || !h) return alert("Merci de remplir ton poids, ton âge et ta taille.");
-    const newProfile = { weight: w, age: a, height: h, gender: profileForm.gender, goal: profileForm.goal };
+    const newProfile = {
+      weight: w, age: a, height: h, gender: profileForm.gender, goal: profileForm.goal,
+      displayName: profileForm.displayName?.trim() || email.split('@')[0],
+      avatar: profileForm.avatar || '🙂'
+    };
     setProfile(newProfile);
     if (email) localStorage.setItem(`${email}_fs_profile`, JSON.stringify(newProfile));
     navigateTo('/private-arena');
+  };
+
+  // ===================== NOUVEAU : MODIFIER LE PROFIL EXISTANT (nom + avatar) =====================
+  const handleProfileEditSubmit = (e) => {
+    e.preventDefault();
+    const updatedProfile = { ...profile, displayName: profileForm.displayName?.trim() || profile.displayName, avatar: profileForm.avatar || profile.avatar };
+    setProfile(updatedProfile);
+    if (email) localStorage.setItem(`${email}_fs_profile`, JSON.stringify(updatedProfile));
+    setWorkoutMode('dashboard');
   };
 
   // ===================== NOUVEAU : DEBLOCAGE PAIEMENT =====================
@@ -248,9 +306,50 @@ function App() {
       setWorkoutMode('payment');
       return;
     }
+    setActiveDay(currentDay);
     setCurrentExerciseIndex(0);
     resetTimersForExercise(0);
     setWorkoutMode('preparation');
+  };
+
+  // ===================== NOUVEAU : OUVRIR UN JOUR DU PARCOURS (checkpoint) =====================
+  const openDayModal = (day) => {
+    if (day > currentDay) return; // jour verrouillé, pas encore atteint
+    if (day >= PAYWALL_DAY && !isUnlocked) {
+      setDayModal(null);
+      setWorkoutMode('payment');
+      return;
+    }
+    setDayModal(day);
+  };
+
+  const launchDayWorkout = (day) => {
+    setActiveDay(day);
+    setDayModal(null);
+    setCurrentExerciseIndex(0);
+    resetTimersForExercise(0);
+    setWorkoutMode('preparation');
+  };
+
+  const launchDayMenu = (day) => {
+    setActiveDay(day);
+    setDayModal(null);
+    setWorkoutMode('nutrition');
+  };
+
+  // ===================== NOUVEAU : ACHETER UN PERSONNAGE DANS LA BOUTIQUE =====================
+  const buyCharacter = (character) => {
+    if (ownedCharacters.includes(character.id)) {
+      setEquippedCharacter(character.id);
+      return;
+    }
+    if (coins < character.cost) {
+      alert("Pas assez de pièces pour ce personnage.");
+      return;
+    }
+    setCoins(prev => prev - character.cost);
+    setOwnedCharacters(prev => [...prev, character.id]);
+    setEquippedCharacter(character.id);
   };
 
   const resetTimersForExercise = (index) => {
@@ -287,9 +386,21 @@ function App() {
     setWorkoutMode('preparation');
   };
 
+  // Estimation des calories brûlées pour un jour donné (sert aussi à calculer les pièces gagnées)
+  const estimateSessionCalories = (day) => {
+    return Math.round(250 * (1 + (Math.min(day, 60) - 1) * (0.5 / 59)));
+  };
+
   const confirmDayAndClose = () => {
-    setCalories(prev => prev + 320);
-    setCurrentDay(prev => prev + 1);
+    const sessionCalories = estimateSessionCalories(activeDay);
+    const earnedCoins = Math.max(1, Math.round(sessionCalories / 10));
+    setCalories(prev => prev + sessionCalories);
+    setCoins(prev => prev + earnedCoins);
+    // On ne fait avancer le jour du parcours que si c'est bien la séance du jour courant
+    // (si la personne rejoue un jour déjà terminé, elle gagne quand même des pièces, mais ça n'avance pas le parcours)
+    if (activeDay === currentDay) {
+      setCurrentDay(prev => prev + 1);
+    }
     setWorkoutMode('dashboard');
   };
 
@@ -615,6 +726,16 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
           <h1 style={{ fontSize: '2.2rem', fontWeight: '900', marginBottom: '8px' }}>Dis-nous en plus sur toi</h1>
           <p style={{ color: '#94a3b8', marginBottom: '30px' }}>Ces infos servent à adapter tes exercices et tes repas à ton profil.</p>
           <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+            <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Ton prénom / pseudo</label>
+            <input type="text" value={profileForm.displayName} onChange={(e) => setProfileForm({ ...profileForm, displayName: e.target.value })} placeholder="Ex : Juba" style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }} />
+
+            <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Choisis ton avatar</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {AVATAR_OPTIONS.map((a) => (
+                <button type="button" key={a} onClick={() => setProfileForm({ ...profileForm, avatar: a })} style={{ fontSize: '1.6rem', padding: '8px 12px', borderRadius: '12px', border: profileForm.avatar === a ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', cursor: 'pointer' }}>{a}</button>
+              ))}
+            </div>
+
             <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Poids (kg)</label>
             <input type="number" min="1" value={profileForm.weight} onChange={(e) => setProfileForm({ ...profileForm, weight: e.target.value })} style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }} required />
 
@@ -685,46 +806,134 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
       );
     }
 
-    // --- ÉCRAN 2 : DASHBOARD ---
+    // --- ÉCRAN 2 : DASHBOARD / PARCOURS (façon Duolingo) ---
     if (workoutMode === 'dashboard') {
-      const bmi = calculateBMI(profile);
-      const mentalTask = MENTAL_TASKS[(currentDay - 1) % MENTAL_TASKS.length];
+      const seasonDays = viewSeason === 1
+        ? Array.from({ length: 30 }, (_, i) => i + 1)
+        : Array.from({ length: 30 }, (_, i) => i + 31);
+
+      return (
+        <div style={{ ...screenWrapperStyle, background: 'linear-gradient(180deg, #1a1440 0%, #0d0a24 60%, #050811 100%)', justifyContent: 'flex-start', padding: '20px 16px 100px 16px' }}>
+
+          {/* Barre du haut : profil, pièces, boutique, quitter */}
+          <div style={{ width: '100%', maxWidth: '600px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <button onClick={() => { setProfileForm({ ...profileForm, displayName: profile?.displayName || '', avatar: profile?.avatar || '🙂' }); setWorkoutMode('profile'); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50px', padding: '6px 14px', color: 'white', cursor: 'pointer' }}>
+              <span style={{ fontSize: '1.4rem' }}>{profile?.avatar || '🙂'}</span>
+              <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{profile?.displayName || 'Profil'}</span>
+            </button>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button onClick={() => setWorkoutMode('shop')} style={{ background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50px', padding: '6px 14px', color: '#ffd700', fontWeight: '900', cursor: 'pointer' }}>
+                🪙 {coins}
+              </button>
+              <button onClick={handleLogout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#ef4444', padding: '6px 14px', borderRadius: '50px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Quitter</button>
+            </div>
+          </div>
+
+          {/* Sélecteur de saison */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '25px' }}>
+            <button onClick={() => setViewSeason(1)} style={{ padding: '10px 22px', borderRadius: '50px', border: viewSeason === 1 ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', background: viewSeason === 1 ? 'rgba(59,130,246,0.15)' : 'transparent', color: 'white', fontWeight: '900', cursor: 'pointer' }}>Saison 1 (1-30)</button>
+            <button onClick={() => setViewSeason(2)} style={{ padding: '10px 22px', borderRadius: '50px', border: viewSeason === 2 ? '2px solid #a855f7' : '1px solid rgba(255,255,255,0.15)', background: viewSeason === 2 ? 'rgba(168,85,247,0.15)' : 'transparent', color: 'white', fontWeight: '900', cursor: 'pointer' }}>Saison 2 (31-60)</button>
+          </div>
+
+          {/* Le parcours en zigzag */}
+          <div style={{ width: '100%', maxWidth: '420px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
+            {seasonDays.map((day, i) => {
+              const status = day < currentDay ? 'done' : day === currentDay ? 'current' : 'locked';
+              const offsetX = Math.round(Math.sin(i * 0.9) * 70);
+              const isBadgeDay = BADGE_DAYS.includes(day);
+              return (
+                <div key={day} style={{ transform: `translateX(${offsetX}px)`, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <button
+                    onClick={() => openDayModal(day)}
+                    disabled={status === 'locked'}
+                    style={{
+                      width: '64px', height: '64px', borderRadius: '50%',
+                      background: status === 'done' ? '#10b981' : status === 'current' ? '#3b82f6' : 'rgba(255,255,255,0.06)',
+                      border: status === 'current' ? '4px solid #93c5fd' : '3px solid rgba(255,255,255,0.15)',
+                      color: 'white', fontWeight: '900', fontSize: '1.2rem',
+                      cursor: status === 'locked' ? 'not-allowed' : 'pointer',
+                      opacity: status === 'locked' ? 0.4 : 1,
+                      boxShadow: status === 'current' ? '0 0 25px rgba(59,130,246,0.6)' : 'none',
+                      position: 'relative'
+                    }}
+                  >
+                    {status === 'done' ? '✓' : status === 'locked' ? '🔒' : day}
+                  </button>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '4px', fontWeight: 'bold' }}>
+                    JOUR {day}{isBadgeDay ? ' 🏅' : ''}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Popup checkpoint : faire la séance ou voir le menu */}
+          {dayModal !== null && (
+            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setDayModal(null)}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: '#151328', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px', padding: '30px', width: '85%', maxWidth: '360px', textAlign: 'center' }}>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '20px' }}>Jour {dayModal}</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <button onClick={() => launchDayWorkout(dayModal)} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '16px', borderRadius: '50px', fontWeight: '900', cursor: 'pointer' }}>🏋️ Faire la séance</button>
+                  <button onClick={() => launchDayMenu(dayModal)} style={{ background: 'transparent', color: '#10b981', border: '2px solid #10b981', padding: '14px', borderRadius: '50px', fontWeight: '900', cursor: 'pointer' }}>🍽️ Voir le menu</button>
+                  <button onClick={() => setDayModal(null)} style={{ background: 'transparent', color: '#94a3b8', border: 'none', padding: '8px', cursor: 'pointer' }}>Fermer</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- NOUVEAU : ÉCRAN BOUTIQUE (acheter des personnages avec les pièces) ---
+    if (workoutMode === 'shop') {
       return (
         <div style={screenWrapperStyle}>
-          <button onClick={handleLogout} style={{ position: 'absolute', top: '30px', right: '40px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#ef4444', padding: '6px 16px', borderRadius: '50px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Quitter</button>
-
-          <div style={{ maxWidth: '600px', width: '100%' }}>
-            <h1 style={{ fontSize: '5rem', fontWeight: '900', margin: '10px 0 30px 0' }}>JOUR {currentDay}</h1>
-
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '24px', padding: '25px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div><span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', fontWeight: 'bold' }}>CALORIES REÇUES</span><strong style={{ fontSize: '1.8rem', color: '#ff3e6c' }}>{calories} kcal</strong></div>
-              {bmi && <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#94a3b8' }}>IMC estimé : {bmi.toFixed(1)} ({getBMICategory(bmi)})</div>}
+          <div style={{ maxWidth: '600px', width: '100%', paddingBottom: '40px' }}>
+            <button onClick={() => setWorkoutMode('dashboard')} style={{ background: 'rgba(255,255,255,0.12)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '50px', marginBottom: '20px', cursor: 'pointer', fontWeight: 'bold' }}>← Retour</button>
+            <h2 style={{ fontSize: '2rem', fontWeight: '900', marginBottom: '6px' }}>🪙 Boutique</h2>
+            <p style={{ color: '#94a3b8', marginBottom: '25px' }}>Tu as <strong style={{ color: '#ffd700' }}>{coins} pièces</strong>. Gagne-en plus en finissant tes séances !</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              {CHARACTERS.map((c) => {
+                const owned = ownedCharacters.includes(c.id);
+                const equipped = equippedCharacter === c.id;
+                return (
+                  <div key={c.id} className="glass-card" style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '2.4rem', marginBottom: '8px' }}>{c.icon}</div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{c.name}</div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '10px' }}>{owned ? 'Possédé' : `${c.cost} 🪙`}</div>
+                    <button onClick={() => buyCharacter(c)} style={{ width: '100%', padding: '10px', borderRadius: '50px', border: 'none', cursor: 'pointer', fontWeight: '900', background: equipped ? '#10b981' : owned ? 'rgba(255,255,255,0.1)' : '#3b82f6', color: 'white' }}>
+                      {equipped ? '✓ Équipé' : owned ? 'Équiper' : 'Acheter'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+          </div>
+        </div>
+      );
+    }
 
-            {/* NOUVEAU : Badges obtenus */}
-            {badges.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
-                {badges.map((d) => (
-                  <span key={d} className="badge-pill">{BADGE_LABELS[d]?.icon} {BADGE_LABELS[d]?.label}</span>
+    // --- NOUVEAU : ÉCRAN MODIFIER LE PROFIL (nom + avatar) ---
+    if (workoutMode === 'profile') {
+      return (
+        <div style={screenWrapperStyle}>
+          <div style={{ maxWidth: '500px', width: '100%' }}>
+            <button onClick={() => setWorkoutMode('dashboard')} style={{ background: 'rgba(255,255,255,0.12)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '50px', marginBottom: '20px', cursor: 'pointer', fontWeight: 'bold' }}>← Retour</button>
+            <h2 style={{ fontSize: '2rem', fontWeight: '900', marginBottom: '20px' }}>Mon profil</h2>
+            <form onSubmit={handleProfileEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+              <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Prénom / pseudo</label>
+              <input type="text" value={profileForm.displayName} onChange={(e) => setProfileForm({ ...profileForm, displayName: e.target.value })} style={{ padding: '14px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', outline: 'none' }} />
+
+              <label style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' }}>Avatar</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {AVATAR_OPTIONS.map((a) => (
+                  <button type="button" key={a} onClick={() => setProfileForm({ ...profileForm, avatar: a })} style={{ fontSize: '1.6rem', padding: '8px 12px', borderRadius: '12px', border: profileForm.avatar === a ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', cursor: 'pointer' }}>{a}</button>
                 ))}
               </div>
-            )}
 
-            {/* NOUVEAU : Tâche mentale du jour */}
-            <div className="glass-card" style={{ textAlign: 'left', marginBottom: '20px' }}>
-              <span style={{ color: '#a855f7', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>🧠 Défi mental du jour</span>
-              <p style={{ margin: 0, fontSize: '1rem', color: '#cbd5e1' }}>{mentalTask}</p>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <button onClick={startFullWorkout} style={{ background: '#3b82f6', color: 'white', border: 'none', width: '100%', padding: '25px', borderRadius: '100px', fontWeight: '900', fontSize: '1.4rem', cursor: 'pointer', textTransform: 'uppercase' }}>
-                🏋️ Lancer ma séance ({program.length} exercices)
-              </button>
-
-              <button onClick={() => setWorkoutMode('nutrition')} style={{ background: 'transparent', color: '#10b981', border: '2px solid #10b981', width: '100%', padding: '20px', borderRadius: '100px', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer', textTransform: 'uppercase' }}>
-                🍽️ Mon Plan Alimentaire du jour
-              </button>
-            </div>
+              <button type="submit" style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '18px', borderRadius: '50px', fontWeight: '900', fontSize: '1.05rem', cursor: 'pointer', textTransform: 'uppercase', marginTop: '10px' }}>Enregistrer</button>
+            </form>
           </div>
         </div>
       );
@@ -732,7 +941,7 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
 
     // --- ÉCRAN 3 : NUTRITION CORRIGÉ (Bouton retour opérationnel) ---
     if (workoutMode === 'nutrition') {
-      const diet = getDayNutrition(currentDay, profile);
+      const diet = getDayNutrition(activeDay, profile);
       return (
         <div style={screenWrapperStyle}>
           <div style={{ maxWidth: '600px', width: '100%', paddingBottom: '40px' }}>
@@ -741,7 +950,7 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
               ← Retour au Dashboard
             </button>
 
-            <h2 style={{ color: '#10b981', fontSize: '2rem', marginBottom: '30px', fontWeight: '900' }}>MENU DU JOUR {currentDay}</h2>
+            <h2 style={{ color: '#10b981', fontSize: '2rem', marginBottom: '30px', fontWeight: '900' }}>MENU DU JOUR {activeDay}</h2>
 
             <div className="glass-card">
               <span style={{ color: '#ff9f43', fontWeight: 'bold', fontSize: '0.9rem', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>🌅 Petit-déjeuner</span>
@@ -840,12 +1049,15 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
 
     // --- ÉCRAN 7 : FIN ---
     if (workoutMode === 'finished') {
+      const sessionCalories = estimateSessionCalories(activeDay);
+      const earnedCoins = Math.max(1, Math.round(sessionCalories / 10));
       return (
         <div style={screenWrapperStyle}>
           <div style={{ maxWidth: '550px', width: '100%' }}>
             <span style={{ fontSize: '4.5rem' }}>👑</span>
             <h1 style={{ fontSize: '3rem', fontWeight: '900', color: '#10b981', margin: '15px 0' }}>Séance Terminée !</h1>
-            <p style={{ color: '#94a3b8', fontSize: '1.15rem', lineHeight: '1.6', marginBottom: '45px' }}>Tu te rapproches de tes objectifs.</p>
+            <p style={{ color: '#94a3b8', fontSize: '1.15rem', lineHeight: '1.6', marginBottom: '10px' }}>Tu te rapproches de tes objectifs.</p>
+            <p style={{ color: '#ffd700', fontSize: '1.1rem', fontWeight: '900', marginBottom: '35px' }}>+{sessionCalories} kcal · +{earnedCoins} 🪙</p>
             <button onClick={confirmDayAndClose} style={{ background: '#ffffff', color: '#050811', border: 'none', width: '100%', padding: '22px', borderRadius: '100px', fontWeight: '900', fontSize: '1.25rem', cursor: 'pointer', textTransform: 'uppercase' }}>🏆 Valider ma journée</button>
           </div>
         </div>
@@ -857,3 +1069,4 @@ html, body, #root { margin: 0 !important; padding: 0 !important; width: 100vw !i
 }
 
 export default App;
+
